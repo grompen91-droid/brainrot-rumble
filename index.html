@@ -70,6 +70,19 @@
   .card .cbody .cdesc { font-size:12.5px; color:#7a6a4a; line-height:1.35; font-weight:600; }
   .card.rare { border-color:#d9a02b; background:#fff8e6; }
   .card.rare .cname { color:#c47f12; }
+  .card .cicon { transition:transform .15s ease; }
+  /* hover lift + icon pop (desktop) */
+  @media (hover:hover) and (pointer:fine){
+    .card { transition:transform .13s ease, box-shadow .13s ease, border-color .13s ease; }
+    .card:hover { transform:translateY(-4px) scale(1.025); box-shadow:0 11px 0 rgba(58,45,34,0.28); border-color:#4aa3df; }
+    .card.rare:hover { border-color:#e0a92e; box-shadow:0 11px 0 rgba(216,160,43,0.35); }
+    .card:hover .cicon { transform:scale(1.18) rotate(-7deg); animation:iconwob .6s ease; }
+    .card:hover .cname { color:#4aa3df; }
+    .card.rare:hover .cname { color:#c47f12; }
+    .bigbtn { transition:transform .1s ease, box-shadow .1s ease, filter .1s ease; }
+    .bigbtn:hover { transform:translateY(-2px); filter:brightness(1.07); }
+  }
+  @keyframes iconwob { 0%{transform:scale(1) rotate(0)} 35%{transform:scale(1.28) rotate(9deg)} 70%{transform:scale(1.12) rotate(-7deg)} 100%{transform:scale(1.18) rotate(-7deg)} }
 
   .stats { font-size:15px; color:#6b8a3a; line-height:1.9; margin-bottom:22px; font-weight:800; }
   .stats b { color:#e8552d; font-size:21px; }
@@ -730,7 +743,7 @@ function update(dt){
         e.shootCd -= dt;
         if(e.shootCd<=0){
           e.shootCd = rand(2.5,4.5);
-          fireEB(e.x,e.y,Math.atan2(P.y-e.y,P.x-e.x),140,'#e58a3a');
+          fireEB(e.x,e.y,Math.atan2(P.y-e.y,P.x-e.x),140,'#e23b3b');
         }
       }
     }
@@ -842,8 +855,8 @@ function updateBoss(e,dt){
   } else {
     if(e.atk > 0.5*rage){ e.atk=0; e.phase+=0.9;
       const aim=Math.atan2(P.y-e.y,P.x-e.x);
-      for(let i=-2;i<=2;i++) fireEB(e.x,e.y,aim+i*0.22,180,'#e58a3a');
-      fireEB(e.x,e.y,e.phase,130,'#5fbf52'); fireEB(e.x,e.y,-e.phase,130,'#5fbf52'); }
+      for(let i=-2;i<=2;i++) fireEB(e.x,e.y,aim+i*0.22,180,'#e23b3b');
+      fireEB(e.x,e.y,e.phase,130,'#b14de5'); fireEB(e.x,e.y,-e.phase,130,'#b14de5'); }
   }
 }
 
@@ -919,15 +932,16 @@ function render(){
     if(gm.x<vx0-40||gm.x>vx1+40||gm.y<vy0-40||gm.y>vy1+40) continue;
     const bob=Math.sin(gm.t*5)*3;
     const name = gm.heart?'heart':(gm.coin?'coin':(gm.v>=3?'gembig':'gem'));
-    drawSprite(name, gm.x, gm.y+bob, gm.v>=3||gm.heart||gm.coin?26:20, 0,0,0,false);
+    const psz = gm.v>=3 ? 40 : (gm.heart?32 : (gm.coin?32 : 31));
+    drawSprite(name, gm.x, gm.y+bob, psz, 0,0,0,false);
   }
 
-  // --- player bullets ---
-  cx.fillStyle='#ffd23a';
+  // --- player bullets: bright gold with a white halo = YOURS ---
   for(const b of bullets){
     if(b.x<vx0-20||b.x>vx1+20||b.y<vy0-20||b.y>vy1+20) continue;
-    cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
-    cx.strokeStyle=OUT; cx.lineWidth=2; cx.stroke();
+    cx.fillStyle='#fff'; cx.beginPath(); cx.arc(b.x,b.y,b.r+2,0,TAU); cx.fill();        // white rim
+    cx.fillStyle='#ffd21f'; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();        // gold core
+    cx.fillStyle='#fff6bf'; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.4,0,TAU); cx.fill(); // highlight
   }
 
   // --- orbs ---
@@ -960,11 +974,12 @@ function render(){
     }
   }
 
-  // --- enemy bullets ---
+  // --- enemy bullets: thick dark rim + dark core = HOSTILE ---
   for(const b of ebullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     cx.fillStyle=b.color||'#e54d4d'; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
-    cx.strokeStyle=OUT; cx.lineWidth=2; cx.stroke();
+    cx.lineWidth=3.2; cx.strokeStyle=OUT; cx.stroke();
+    cx.fillStyle='rgba(0,0,0,0.42)'; cx.beginPath(); cx.arc(b.x,b.y,b.r*0.42,0,TAU); cx.fill();
   }
 
   // --- player ---
