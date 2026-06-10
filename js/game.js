@@ -35,9 +35,9 @@ const FOES = [
   { spr:'hippo',     name:'Il Cacto Hipopotamo', hp:22, sp:34, r:25, xp:5, score:55, shoot:{type:'ring',n:8,cd:3.6,spd:120,col:'#6b9233'}, aoe:{r:46,dps:15,life:1.1,tele:0.6,col:'#6b9233',cd:4.0} },
   { spr:'turtle',    name:'Torrtuginni',   hp:26, sp:30, r:24, xp:5, score:55, shell:true },
   // Tier V — elites
-  { spr:'panda',     name:'Pandaccini',    hp:14, sp:58, r:20, xp:4, score:40 },
+  { spr:'panda',     name:'Pandaccini',    hp:14, sp:58, r:20, xp:4, score:40, aoe:{r:42,dps:4,life:1.6,tele:0.5,slow:true,col:'#f7d24a',cd:3.0} },
   { spr:'tiger',     name:'Tigrrullini',   hp:14, sp:76, r:20, xp:4, score:44, dash:true, shoot:{type:'aim',n:5,cd:3.4,spd:155,col:'#e54d4d'} },
-  { spr:'capy',      name:'Capybarelli',   hp:16, sp:46, r:21, xp:5, score:48 },
+  { spr:'capy',      name:'Capybarelli',   hp:16, sp:46, r:21, xp:5, score:48, support:true },
 ];
 const BOSSES = [
   { spr:'tralalero', name:'TRALALERO TRALALA',        hp:150, r:54, pattern:'spiral' },
@@ -166,6 +166,7 @@ function spawnEnemy(){
     aoe:def.aoe, aoeCd:rand(1.5,3),
     dash:def.dash, dst:'idle', dcd:rand(2,4), da:0, dwin:0, ddur:0,
     shell:def.shell, shellCd:rand(3,5), iv:0,
+    support:def.support, supCd:rand(2,3.5),
     t:rand(0,TAU), wob:rand(2,4), shootCd:rand(1.5,4), frz:0, isBoss:false, hitT:0, sq:0, face:1
   });
 }
@@ -451,6 +452,13 @@ function update(dt){
           e.aoeCd -= dt;
           if(e.aoeCd<=0){ e.aoeCd = e.aoe.cd||3.5; addZone(P.x+rand(-24,24), P.y+rand(-24,24), e.aoe.r, e.aoe); }
         }
+        if(e.support){     // Capybarelli heals nearby foes -> priority kill
+          e.supCd -= dt;
+          if(e.supCd<=0){ e.supCd=2.6; let healed=false;
+            for(const o of enemies){ if(o!==e && !o.isBoss && o.hp<o.maxHp && dist2(e.x,e.y,o.x,o.y)<150*150){ o.hp=Math.min(o.maxHp,o.hp+o.maxHp*0.10); healed=true; } }
+            if(healed) floatText(e.x,e.y-e.r-6,'+heal','#7ed957',13);
+          }
+        }
       }
     }
 
@@ -563,11 +571,36 @@ function fireEB(x,y,a,sp,color){
 }
 
 function updateBoss(e,dt){
-  const tx = clamp(P.x + Math.sin(e.t*0.5)*260, WALL+e.r, WORLD.w-WALL-e.r);
-  const ty = clamp(P.y - 220 + Math.cos(e.t*0.4)*60, WALL+e.r, WORLD.h-WALL-e.r);
-  e.x += (tx-e.x)*0.9*dt; e.y += (ty-e.y)*0.9*dt;
-  e.atk = (e.atk||0)+dt;
-  const rage = e.hp/e.maxHp < 0.4 ? 0.6 : 1;
+  e.atk = (e.atk||0)+dt; e.gim = (e.gim||0)+dt;
+  if(!e.enraged && e.hp/e.maxHp < 0.4){ e.enraged=true; bigText('ENRAGED!','#e54d4d'); shake=Math.max(shake,12); }
+
+  // ---- per-boss gimmick (uses the Phase-3 zone/dash systems) ----
+  let dashing=false;
+  if(e.spr==='tralalero'){                 // speed bruiser: charge-dashes you
+    if(e.dst==='dash'){ dashing=true; e.ddur-=dt; e.x+=Math.cos(e.da)*520*dt; e.y+=Math.sin(e.da)*520*dt; if(e.ddur<=0) e.dst='idle'; }
+    else if(e.gim>(e.enraged?1.3:2.1)){ e.gim=0; e.dst='dash'; e.ddur=0.4; e.da=Math.atan2(P.y-e.y,P.x-e.x); }
+  } else if(e.spr==='crocodilo'){          // bomber: carpet-bomb telegraphed zones
+    if(e.gim>(e.enraged?1.1:1.7)){ e.gim=0; for(let k=0;k<3;k++) addZone(P.x+rand(-130,130),P.y+rand(-130,130),44,{tele:0.7,life:1.0,dps:16,col:'#e8a93a'}); }
+  } else if(e.spr==='sahur'){              // rhythmic ground-slam shockwave
+    if(e.gim>(e.enraged?1.0:1.5)){ e.gim=0; addZone(P.x,P.y,72,{tele:0.55,life:0.7,dps:20,col:'#a9763e'}); shake=Math.max(shake,8); sfx.hit(); }
+  } else if(e.spr==='vaca'){               // gravity pulse: tugs you toward it
+    if(e.gim>2.6){ e.gim=0; e.pull=0.7; }
+    if(e.pull>0){ e.pull-=dt; const a=Math.atan2(e.y-P.y,e.x-P.x); P.x+=Math.cos(a)*95*dt; P.y+=Math.sin(a)*95*dt; P.x=clamp(P.x,WALL+P.r,WORLD.w-WALL-P.r); P.y=clamp(P.y,WALL+P.r,WORLD.h-WALL-P.r); }
+  } else if(e.spr==='gorillo'){            // watermelon smash: big zone + seed ring
+    if(e.gim>(e.enraged?1.6:2.4)){ e.gim=0; addZone(P.x,P.y,60,{tele:0.7,life:1.0,dps:18,col:'#3f7d33'}); const off=rand(0,TAU); for(let k=0;k<12;k++) fireEB(e.x,e.y,off+k*TAU/12,130,'#e0503f'); }
+  } else if(e.spr==='trippi'){             // glitch: randomly swaps its own pattern
+    if(e.gim>3){ e.gim=0; e.pattern=pick(['spiral','rings','chaos']); }
+  }
+
+  // anchor drift toward the player (unless mid-dash)
+  if(!dashing){
+    const tx = clamp(P.x + Math.sin(e.t*0.5)*260, WALL+e.r, WORLD.w-WALL-e.r);
+    const ty = clamp(P.y - 220 + Math.cos(e.t*0.4)*60, WALL+e.r, WORLD.h-WALL-e.r);
+    e.x += (tx-e.x)*0.9*dt; e.y += (ty-e.y)*0.9*dt;
+  }
+  e.x = clamp(e.x, WALL+e.r, WORLD.w-WALL-e.r); e.y = clamp(e.y, WALL+e.r, WORLD.h-WALL-e.r);
+
+  const rage = e.enraged ? 0.6 : 1;
   if(e.pattern==='spiral'){
     if(e.atk > 0.13*rage){ e.atk=0; e.phase+=0.42;
       fireEB(e.x,e.y,e.phase,160,'#e54d4d'); fireEB(e.x,e.y,e.phase+Math.PI,160,'#e54d4d'); }
