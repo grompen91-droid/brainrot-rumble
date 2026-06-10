@@ -1,4 +1,4 @@
-# EMBERHOLD — Game Rework Plan
+# VERDANT SIEGE — Game Rework Plan
 
 A full design plan to rework the current game (*Brainrot Survivors*) into a new
 theme with a deeper enemy roster, real bosses, new abilities, and a Survivor.io-style
@@ -9,23 +9,28 @@ theme with a deeper enemy roster, real bosses, new abilities, and a Survivor.io-
 
 ---
 
-## 1. Theme: **Emberhold — The Last Siege**
+## 1. Theme: **Verdant Siege — Hold the Greenfields**
 
-A dark-fantasy **fortress-siege bullet hell**. You're a lone champion holding a ruined
-castle courtyard while waves of undead, goblinoids, and demons pour in. Keeps the
-engine's flat, no-glow cartoon look but swaps the cheerful garden for a moody-but-grounded
-medieval battlefield — a totally different game without breaking the established art rules.
+A bright **fantasy survivor bullet hell**: a lone champion defends a sunlit kingdom's
+green fields as waves of monsters — slimes, goblins, undead, beasts, and demons — pour
+across the meadow. **Keeps the game's existing grassy daylight cartoon world** (the exact
+look you already have) and layers the new monster roster, bosses, and abilities on top.
+No dungeon, no dark palette — just the green field you've got, with better stuff in it.
 
-### World & vibe
-- **Palette:** muted stone greys, dirt brown, iron, oxblood-red banners, **ember-orange**
-  as the single hot accent. Flat cel-shading, dark outlines, **no glow** (torches/embers
-  are flat shapes + particles, not bloom).
-- **Ground:** cobblestone + cracked-dirt checker tiles (reskin of the grass tiles).
-- **Border:** a **castle battlement wall** with crenellations + iron portcullis corners
-  (reskin of the wooden fence).
-- **Atmosphere:** drifting ember/ash particles, banners, scattered bones/rubble props.
-- **Player:** a hooded **ranger/knight** (cape that flips with facing; the shades become a visored helm).
-- **Audio:** deeper synth hits, sword *clang* on impact, choir stab on boss spawn.
+### World & vibe — keep the grassy landscape
+- **Ground:** **unchanged — the existing grass checkerboard field stays.** Optionally
+  sprinkle in flat props (flowers, mushrooms, small rocks, a banner/signpost) for flavor.
+- **Border:** keep the **wooden fence** as-is (corners can get hedges or a little stone
+  gate) — still a sunny field boundary, never a dungeon wall.
+- **Palette:** the current daylight greens + earthy browns, with **one warm accent**
+  (banner-red / gold) per faction. Flat cel-shading, dark outlines, **no glow**.
+- **Atmosphere:** drifting pollen/leaf/petal particles instead of ash — sunny, not moody.
+- **Player:** the current hero works as-is (or a light fantasy adventurer — cap & cloak, no dark armor).
+- **Audio:** upbeat synth hits, a sword *clang* on impact, a horn-call on boss spawn.
+
+> The monsters and bosses below are all classic-fantasy creatures that read perfectly fine
+> on a sunny grass field (think a green RPG overworld), so the new content drops in without
+> touching the map you like.
 
 ### Enemy design = roles, not just skins
 Every enemy fills one **bullet-hell role** so fights stay readable:
@@ -76,10 +81,10 @@ Every enemy fills one **bullet-hell role** so fights stay readable:
 ## 3. Bosses (5) — unique gimmick + attack phases
 
 ### B1 · **Mortenn, the Lich King** — *wave 5* (caster)
-- **Gimmick:** raises **Graveyard Fields** — DoT zones bloom on random tiles you must avoid.
+- **Gimmick:** raises **Blighted Ground** — patches of withered/cursed grass (DoT zones) bloom on random tiles you must avoid.
 - **P1:** continuous **rotating bone-spiral** + aimed 3-fan.
 - **P2 (<60%):** **teleports** around the arena, drops a **ring-of-12** on each arrival.
-- **P3 (<30%):** summons 4 skeletons + a **counter-rotating double spiral**; graveyard fields multiply.
+- **P3 (<30%):** summons 4 skeletons + a **counter-rotating double spiral**; blighted patches multiply.
 
 ### B2 · **Cinderwing, the Ash Dragon** — *wave 10* (aerial)
 - **Gimmick:** alternates **flying** (hard to hit, raining attacks) and **grounded** (vulnerable, melee-dangerous).
@@ -118,7 +123,7 @@ The current engine only has chase / aimed-shot / 3 boss patterns. To support the
 ## 5. Abilities
 
 Built for survivors-style auto-combat **plus** dense bullet hell — several interact with
-*enemy bullets*, not just enemies. Themed for Emberhold; mechanics are theme-agnostic.
+*enemy bullets*, not just enemies. Themed for Verdant Siege; mechanics are theme-agnostic.
 
 ### 🗡️ Weapons (change *how* auto-attack works)
 1. **Cinder Bolt** *(default+)* — every 5th shot is a **charged bolt** that pierces all + leaves a fire trail.
@@ -241,7 +246,7 @@ Recommendation: ship the simple version first, layer gating on later if desired.
 
 ---
 
-## 7. Upgrade & pickup re-skin (same effects, Emberhold names)
+## 7. Upgrade & pickup re-skin (same effects, Verdant Siege names)
 Whetstone (+dmg) · Adrenaline (+fire rate) · Boots of Haste (+speed) · Twin Daggers (+projectile) ·
 Armor-Piercing (pierce) · **Longbow (+range)** · Iron Heart (+HP) · Loot Charm (magnet) ·
 Eagle Eye (crit) · Blink Step (dash cd) · Guardian Wisp (orb) · **Holy Nova** (shockwave) ·
@@ -251,8 +256,9 @@ coin → **gold**, heart → **health potion**.
 ---
 
 ## 8. Suggested build order
-1. **Reskin pass** (cheap, big impact): palette, map tiles, wall border, player + ~8 sprites,
-   upgrade names — runs on the *existing* mechanics (chase/shoot + spiral/rings/chaos bosses).
+1. **Content pass** (cheap, big impact): **keep the grass map, fence, and daylight palette**;
+   just add the new monster + boss sprites (and upgrade names) on the *existing* mechanics
+   (chase/shoot + spiral/rings/chaos bosses).
 2. **Card leveling + evolution system** (contained change to `js/game.js` + a little CSS for badges).
 3. **Core new mechanics:** telegraphs, ground zones, lasers, splitters/summoners.
 4. **Elites + bosses 3–5** using those mechanics.
