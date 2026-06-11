@@ -89,12 +89,39 @@ function loadWorld(idx){
   const w = curWorld(); curFoes = w.foes; curBosses = w.bosses; curTheme = w.theme;
   document.body.style.background = curTheme.bg;
 }
+let cut = null;   // cutscene state
 function worldCleared(boss){
   unlockedMax = Math.min(WORLDS.length-1, Math.max(unlockedMax, worldIdx+1));
   localStorage.setItem('br_unlocked', unlockedMax);
   selWorld = Math.min(WORLDS.length-1, worldIdx+1);
-  quitToMenu();   // later task swaps this for the cutscene
+  state = ST.CUTSCENE;
+  cut = { t:0, boss:boss, alpha:1, fade:0, name:curWorld().name };
+  boss.cut = true; boss.deathScale = 1;
+  enemies.length=0; enemies.push(boss);   // keep only the dying boss on screen
+  ebullets=[]; bullets=[]; zones=[];
+  hitstop=0.25; shake=Math.max(shake,16);
+  stopMusic(); sfx.win();
+  bigText('WORLD CLEARED', '#ffd24a');
 }
+function cutsceneUpdate(dt){
+  computeCamera();
+  if(!cut) return;
+  cut.t += dt;
+  const b=cut.boss;
+  b.sq = 0.6;
+  if(cut.t < 1.4 && Math.random()<0.5) burst(b.x+rand(-b.r,b.r), b.y+rand(-b.r,b.r), '#ffd24a', 10, 260);
+  b.deathScale = 1 + cut.t*0.5;
+  cut.alpha = Math.max(0, 1 - (cut.t-1.0)/0.8);           // boss fades out 1.0..1.8s
+  if(cut.t > 1.6) cut.fade = Math.min(1, (cut.t-1.6)/0.7); // screen fades to theme color
+  for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.t=(p.t||0)+dt; p.x+=(p.vx||0)*dt; p.y+=(p.vy||0)*dt; p.life-=dt; if(p.life<=0) parts.splice(i,1); }
+  for(let i=texts.length-1;i>=0;i--){ const tx=texts[i]; tx.t=(tx.t||0)+dt; tx.y+=(tx.vy||0)*dt; tx.life-=dt; if(tx.life<=0) texts.splice(i,1); }
+  if(cut.t > 2.5){ cut=null; toMenuFromClear(); }
+}
+function toMenuFromClear(){
+  quitToMenu();           // existing teardown -> menu (full reset)
+  triggerUnlockReveal();  // defined in a later task; stub for now
+}
+function triggerUnlockReveal(){}   // STUB — a later task fills this in
 
 // ---- rarity tiers: lower weight = rarer in the level-up draw (appearance-only) ----
 const RARITY = {
@@ -1076,7 +1103,9 @@ function render(){
       cx.setLineDash([]); cx.globalAlpha=1;
     }
     const wob = e.isBoss ? Math.sin(e.t*2)*0.06 : Math.sin(e.t*6)*0.12;
-    drawSprite(e.spr, e.x, e.y, e.r*2.5, wob, e.sq, e.hitT, e.face===-1, curTheme.tint);
+    if(e.cut && cut){ cx.globalAlpha = cut.alpha; }
+    drawSprite(e.spr, e.x, e.y, e.r*2.5*(e.deathScale||1), wob, e.sq, e.hitT, e.face===-1, curTheme.tint);
+    if(e.cut){ cx.globalAlpha = 1; }
     if(e.frz>0){ cx.globalAlpha=0.4; cx.fillStyle='#bfe6ff'; cx.beginPath(); cx.arc(e.x,e.y,e.r*1.05,0,TAU); cx.fill(); cx.globalAlpha=1; }
     if(e.iv>0){ cx.strokeStyle='#d8b46a'; cx.lineWidth=4; cx.globalAlpha=0.85; cx.beginPath(); cx.arc(e.x,e.y,e.r+6,0,TAU); cx.stroke(); cx.globalAlpha=1; }
     if(e.hp<e.maxHp){
@@ -1167,6 +1196,9 @@ function render(){
 
   // hurt vignette
   if(hitFlash>0){ cx.fillStyle=`rgba(220,40,40,${hitFlash*0.22})`; cx.fillRect(0,0,W,H); }
+  if(state===ST.CUTSCENE && cut && cut.fade>0){
+    cx.save(); cx.globalAlpha=cut.fade; cx.fillStyle=curTheme.bg; cx.fillRect(0,0,W,H); cx.restore();
+  }
 }
 
 function drawBorder(vx0,vy0,vx1,vy1){
@@ -1248,6 +1280,7 @@ function loop(t){
   if(hitstop>0){ hitstop-=dt; dt=0; }
   if(state===ST.PLAY) update(dt);
   else if(state===ST.MENU) menuUpdate(dt);
+  else if(state===ST.CUTSCENE) cutsceneUpdate(dt);
   render();
 }
 
