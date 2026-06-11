@@ -121,7 +121,18 @@ function toMenuFromClear(){
   quitToMenu();           // existing teardown -> menu (full reset)
   triggerUnlockReveal();  // defined in a later task; stub for now
 }
-function triggerUnlockReveal(){}   // STUB — a later task fills this in
+// ---- world-select carousel (menu) ----
+function worldLabel(i){ return 'WORLD '+(i+1)+' · '+(i<=unlockedMax ? WORLDS[i].name : '??? 🔒'); }
+function refreshWorldSel(){
+  $('wname').textContent = worldLabel(selWorld);
+  $('wprev').disabled = selWorld<=0;
+  $('wnext').disabled = selWorld>=unlockedMax;   // can't pick locked worlds
+}
+function triggerUnlockReveal(){
+  refreshWorldSel();
+  const el=$('worldsel'); if(el){ el.classList.remove('reveal'); void el.offsetWidth; el.classList.add('reveal'); }
+  bigText('NEW WORLD UNLOCKED','#ffd24a');
+}
 
 // ---- rarity tiers: lower weight = rarer in the level-up draw (appearance-only) ----
 const RARITY = {
@@ -1347,5 +1358,8 @@ setInterval(()=>{
 
 requestAnimationFrame(loop);
 
-$('startbtn').addEventListener('click', startGame);
+$('startbtn').addEventListener('click', ()=>startGame(selWorld));
+$('wprev').addEventListener('click', ()=>{ if(selWorld>0){ selWorld--; refreshWorldSel(); sfx.pick(); } });
+$('wnext').addEventListener('click', ()=>{ if(selWorld<unlockedMax){ selWorld++; refreshWorldSel(); sfx.pick(); } });
+refreshWorldSel();
 $('retrybtn').addEventListener('click', startGame);
