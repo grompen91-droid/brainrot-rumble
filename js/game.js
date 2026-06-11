@@ -23,7 +23,7 @@ const FOES = [
   { spr:'flamingo', name:'Flamingulli',   hp:3,  sp:82, r:16, xp:1, score:12 },
   { spr:'duck',     name:'Quacodillo',    hp:3,  sp:72, r:15, xp:1, score:14, death:{type:'ring',n:4} },
   // Tier II — infantry
-  { spr:'cappuccino',name:'Cappuccino Assassino', hp:5, sp:90, r:15, xp:2, score:18, shoot:{type:'aim',n:1,cd:2.6,spd:175} },
+  { spr:'cappuccino',name:'Cappuccino Assassino', hp:5, sp:90, r:15, xp:2, score:18, shoot:{type:'aim',n:1,cd:2.6,spd:175,col:'#d8e0ea'} },
   { spr:'ballerina', name:'Ballerina Cappuccina', hp:5, sp:64, r:16, xp:2, score:18, shoot:{type:'ring',n:6,cd:3.2,spd:120,col:'#c98a4f'} },
   { spr:'candypig',  name:'Svinino',       hp:6,  sp:70, r:16, xp:2, score:18, shoot:{type:'aim',n:1,cd:2.8,spd:130,col:'#f06fa8'} },
   { spr:'beaver',    name:'Castori Gangsteri', hp:7, sp:62, r:17, xp:2, score:22, shoot:{type:'aim',n:3,cd:2.4,spd:175,col:'#caa12f'} },
@@ -34,10 +34,10 @@ const FOES = [
   { spr:'goose',     name:'Bombombini',    hp:8,  sp:74, r:18, xp:3, score:30, shoot:{type:'aim',n:3,cd:2.6,spd:150,col:'#e58a3a'} },
   { spr:'octopus',   name:'Blueberrinni',  hp:9,  sp:50, r:19, xp:3, score:30, shoot:{type:'ring',n:8,cd:3.0,spd:120,col:'#5b6cf0'} },
   { spr:'jelly',     name:'Graipussi Medussi', hp:8, sp:46, r:19, xp:3, score:30, shoot:{type:'ring',n:6,cd:2.8,spd:95,col:'#d36fb0'} },
-  { spr:'espresso',  name:'Espressona Signora', hp:9, sp:58, r:17, xp:3, score:32, shoot:{type:'ring',n:5,cd:2.2,spd:130,col:'#5b3a22'} },
-  { spr:'orangutan', name:'Orangutini',    hp:10, sp:54, r:20, xp:4, score:34, shoot:{type:'aim',n:1,cd:2.4,spd:140,col:'#e0b400'} },
+  { spr:'espresso',  name:'Espressona Signora', hp:9, sp:58, r:17, xp:3, score:32, shoot:{type:'ring',n:5,cd:2.2,spd:130,col:'#a16a3c'} },
+  { spr:'orangutan', name:'Orangutini',    hp:10, sp:54, r:20, xp:4, score:34, shoot:{type:'aim',n:1,cd:2.4,spd:140,col:'#e07a2a'} },
   // Tier IV — heavies
-  { spr:'rhino',     name:'Rhino Toasterino', hp:18, sp:42, r:23, xp:4, score:45, shoot:{type:'aim',n:2,cd:3.0,spd:140,col:'#caa12f'}, aoe:{r:42,dps:14,life:1.3,tele:0.7,col:'#e8a93a',cd:3.6} },
+  { spr:'rhino',     name:'Rhino Toasterino', hp:18, sp:42, r:23, xp:4, score:45, shoot:{type:'aim',n:2,cd:3.0,spd:140,col:'#e8b96a'}, aoe:{r:42,dps:14,life:1.3,tele:0.7,col:'#e8a93a',cd:3.6} },
   { spr:'camel',     name:'Frigo Camelo',  hp:20, sp:38, r:24, xp:5, score:50, aoe:{r:52,dps:9,life:1.6,tele:0.6,slow:true,col:'#9fd0ff',cd:3.4} },
   { spr:'hippo',     name:'Il Cacto Hipopotamo', hp:22, sp:34, r:25, xp:5, score:55, shoot:{type:'ring',n:8,cd:3.6,spd:120,col:'#6b9233'}, aoe:{r:46,dps:15,life:1.1,tele:0.6,col:'#6b9233',cd:4.0} },
   { spr:'turtle',    name:'Torrtuginni',   hp:26, sp:30, r:24, xp:5, score:55, shell:true },
@@ -107,7 +107,7 @@ function resetPlayer(){
     x:WORLD.w/2, y:WORLD.h/2, r:18, hp:100, maxHp:100, speed:200,
     dmg:10, fireRate:0.32, fireCd:0, shots:1, pierce:0, range:330,
     magnet:90, crit:0.05, orbs:0, orbA:0, nova:false, novaCd:5, novaCdBase:5, novaPow:1,
-    vamp:0, bslow:1, lv:1, xp:0, xpNext:5, inv:0, up:{}, slowT:0,
+    vamp:0, bslow:1, lv:1, xp:0, xpNext:4, inv:0, up:{}, slowT:0,
     face:0, walk:0, dashCd:0, dashMax:2.2, dashT:0, dvx:0, dvy:0,
     radial:false, railgun:false, orbShield:false, novaEvo:false, freeze:false
   });
@@ -207,6 +207,12 @@ function hitSpark(x,y,color,crit){
     parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(0.1,0.26),max:0.26,color,r:rand(1.2,crit?3:2)}); }
   parts.push({x,y,vx:0,vy:0,life:0.09,max:0.09,color:'#ffffff',r:crit?4.5:3});
 }
+// muzzle flash: short colored burst at the shooter so its projectiles are easy to trace back
+function muzzleFlash(x,y,color){
+  parts.push({x,y,vx:0,vy:0,life:0.18,max:0.18,color,r:9,ring:true,gr:150,lw:3});
+  for(let i=0;i<5;i++){ const a=rand(0,TAU), s=rand(40,120);
+    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(0.12,0.28),max:0.28,color,r:rand(1.5,3)}); }
+}
 function floatText(x,y,str,color='#fff',size=14){
   texts.push({x,y,str,color,size,life:0.9,max:0.9,vy:-55});
 }
@@ -224,7 +230,7 @@ function gainXp(n){
   while(P.xp >= P.xpNext){
     P.xp -= P.xpNext;
     P.lv++;
-    P.xpNext = Math.floor(5 + P.lv*4 + P.lv*P.lv*0.6);
+    P.xpNext = Math.floor(4 + P.lv*2.6 + P.lv*P.lv*0.4);
     openLevelUp();
   }
   $('leveltag').textContent = 'LV '+P.lv;
@@ -479,6 +485,7 @@ function update(dt){
           if(e.shootCd<=0){
             e.shootCd = e.shoot.cd || rand(2.5,4.5);
             const spd = e.shoot.spd||140, col = e.shoot.col||'#e23b3b';
+            muzzleFlash(e.x, e.y, col);   // colored puff = "this enemy fired these bullets"
             if(e.shoot.type==='ring'){ const n=e.shoot.n||8, off=rand(0,TAU); for(let k=0;k<n;k++) fireEB(e.x,e.y, off+k*TAU/n, spd, col); }
             else { const n=e.shoot.n||1, aim=Math.atan2(P.y-e.y,P.x-e.x); for(let k=0;k<n;k++) fireEB(e.x,e.y, aim+(k-(n-1)/2)*0.18, spd, col); }
           }
@@ -513,14 +520,14 @@ function update(dt){
         $('bossbar').classList.add('hidden');
         playMusic('game'); sfx.win();
         bigText('BOSS DOWN','#4aa3df');
-        for(let g=0; g<14; g++) gems.push({x:e.x+rand(-40,40),y:e.y+rand(-40,40),v:3,t:rand(0,6)});
-        for(let g=0; g<8; g++) gems.push({x:e.x+rand(-50,50),y:e.y+rand(-50,50),coin:true,t:rand(0,6)});
+        for(let g=0; g<14; g++){ const a=rand(0,TAU), s=rand(120,300); gems.push({x:e.x,y:e.y,v:3,t:rand(0,6),vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
+        for(let g=0; g<8; g++){ const a=rand(0,TAU), s=rand(120,300); gems.push({x:e.x,y:e.y,coin:true,t:rand(0,6),vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
         ebullets=[];
       } else {
         if(e.death && e.death.type==='ring'){ const n=e.death.n||4; for(let k=0;k<n;k++) fireEB(e.x,e.y,k*TAU/n,150,'#e58a3a'); }
-        for(let g=0; g<e.xp; g++) gems.push({x:e.x+rand(-10,10),y:e.y+rand(-10,10),v:1,t:rand(0,6)});
-        if(Math.random()<0.12) gems.push({x:e.x,y:e.y,coin:true,t:0});
-        if(Math.random()<0.025) gems.push({x:e.x,y:e.y,heart:true,t:0});
+        for(let g=0; g<e.xp; g++){ const a=rand(0,TAU), s=rand(90,210); gems.push({x:e.x,y:e.y,v:1,t:rand(0,6),vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
+        if(Math.random()<0.12){ const a=rand(0,TAU), s=rand(90,210); gems.push({x:e.x,y:e.y,coin:true,t:0,vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
+        if(Math.random()<0.025){ const a=rand(0,TAU), s=rand(90,210); gems.push({x:e.x,y:e.y,heart:true,t:0,vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
       }
       $('scoretag').textContent = '★ '+score;
     }
@@ -548,6 +555,7 @@ function update(dt){
   for(let i=gems.length-1;i>=0;i--){
     const g=gems[i];
     g.t+=dt;
+    if(g.vx||g.vy){ g.x += g.vx*dt; g.y += g.vy*dt; const damp = Math.pow(0.0008, dt); g.vx *= damp; g.vy *= damp; }
     const d = dist2(g.x,g.y,P.x,P.y);
     if(d < P.magnet*P.magnet){
       const dd=Math.sqrt(d)||1;
@@ -613,10 +621,11 @@ function updateBoss(e,dt){
   // ---- per-boss gimmick (uses the Phase-3 zone/dash systems) ----
   let dashing=false;
   if(e.spr==='tralalero'){                 // speed bruiser: charge-dashes you
-    if(e.dst==='dash'){ dashing=true; e.ddur-=dt; e.x+=Math.cos(e.da)*520*dt; e.y+=Math.sin(e.da)*520*dt; if(e.ddur<=0) e.dst='idle'; }
-    else if(e.gim>(e.enraged?1.3:2.1)){ e.gim=0; e.dst='dash'; e.ddur=0.4; e.da=Math.atan2(P.y-e.y,P.x-e.x); }
+    if(e.dst==='wind'){ dashing=true; e.dwin-=dt; if(e.dwin<=0){ e.dst='dash'; e.ddur=0.4; } }   // pause + red telegraph line, then commit
+    else if(e.dst==='dash'){ dashing=true; e.ddur-=dt; e.x+=Math.cos(e.da)*520*dt; e.y+=Math.sin(e.da)*520*dt; if(e.ddur<=0) e.dst='idle'; }
+    else if(e.gim>(e.enraged?1.3:2.1)){ e.gim=0; e.dst='wind'; e.dwin=e.enraged?0.4:0.55; e.da=Math.atan2(P.y-e.y,P.x-e.x); }
   } else if(e.spr==='crocodilo'){          // bomber: carpet-bomb telegraphed zones
-    if(e.gim>(e.enraged?1.1:1.7)){ e.gim=0; for(let k=0;k<3;k++) addZone(P.x+rand(-130,130),P.y+rand(-130,130),44,{tele:0.7,life:1.0,dps:16,col:'#e8a93a'}); }
+    if(e.gim>(e.enraged?1.1:1.7)){ e.gim=0; for(let k=0;k<3;k++) addZone(P.x+rand(-130,130),P.y+rand(-130,130),44,{tele:0.7,life:1.0,dps:16,col:'#ff2e2e'}); }
   } else if(e.spr==='sahur'){              // rhythmic ground-slam shockwave
     if(e.gim>(e.enraged?1.0:1.5)){ e.gim=0; addZone(P.x,P.y,72,{tele:0.55,life:0.7,dps:20,col:'#a9763e'}); shake=Math.max(shake,8); sfx.hit(); }
   } else if(e.spr==='vaca'){               // gravity pulse: tugs you toward it
@@ -781,9 +790,11 @@ function render(){
   // --- enemy bullets: thick dark rim + dark core = HOSTILE ---
   for(const b of ebullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
-    cx.fillStyle=b.color||'#e54d4d'; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
-    cx.lineWidth=3.2; cx.strokeStyle=OUT; cx.stroke();
-    cx.fillStyle='rgba(0,0,0,0.42)'; cx.beginPath(); cx.arc(b.x,b.y,b.r*0.42,0,TAU); cx.fill();
+    const bc=b.color||'#e54d4d';
+    cx.globalAlpha=0.3; cx.fillStyle=bc; cx.beginPath(); cx.arc(b.x,b.y,b.r*1.8,0,TAU); cx.fill(); cx.globalAlpha=1; // colored glow = shooter's tint
+    cx.fillStyle=bc; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
+    cx.lineWidth=3.2; cx.strokeStyle=OUT; cx.stroke();                                                            // dark rim = hostile
+    cx.fillStyle='rgba(255,255,255,0.55)'; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.34,0,TAU); cx.fill(); // glossy highlight
   }
 
   // --- player ---
@@ -883,14 +894,14 @@ function renderZones(){
   for(const z of zones){
     if(z.t<z.tele){                       // telegraph: pulsing dashed ring + filling
       const k=z.t/z.tele;
-      cx.globalAlpha=0.5+0.3*Math.sin(z.t*22);
-      cx.strokeStyle=z.col; cx.lineWidth=3; cx.setLineDash([9,8]);
+      cx.globalAlpha=0.7+0.3*Math.sin(z.t*22);
+      cx.strokeStyle=z.col; cx.lineWidth=5; cx.setLineDash([9,8]);
       cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.stroke(); cx.setLineDash([]);
-      cx.globalAlpha=0.14; cx.fillStyle=z.col; cx.beginPath(); cx.arc(z.x,z.y,z.r*k,0,TAU); cx.fill();
+      cx.globalAlpha=0.30; cx.fillStyle=z.col; cx.beginPath(); cx.arc(z.x,z.y,z.r*k,0,TAU); cx.fill();
     } else {                              // active: fades over its life
       const k=Math.max(0,1-(z.t-z.tele)/z.life);
-      cx.globalAlpha=0.32*k+0.08; cx.fillStyle=z.col; cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.fill();
-      cx.globalAlpha=0.6*k; cx.strokeStyle=z.col; cx.lineWidth=3; cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.stroke();
+      cx.globalAlpha=0.45*k+0.14; cx.fillStyle=z.col; cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.fill();
+      cx.globalAlpha=0.85*k; cx.strokeStyle=z.col; cx.lineWidth=5; cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.stroke();
     }
   }
   cx.globalAlpha=1;
