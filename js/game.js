@@ -82,6 +82,19 @@ function curWorld(){ return WORLDS[worldIdx]; }
 let curFoes   = WORLDS[0].foes;
 let curBosses = WORLDS[0].bosses;
 let curTheme  = WORLDS[0].theme;
+let unlockedMax = +(localStorage.getItem('br_unlocked')||0);
+let selWorld = Math.min(unlockedMax, WORLDS.length-1);
+function loadWorld(idx){
+  worldIdx = clamp(idx,0,WORLDS.length-1);
+  const w = curWorld(); curFoes = w.foes; curBosses = w.bosses; curTheme = w.theme;
+  document.body.style.background = curTheme.bg;
+}
+function worldCleared(boss){
+  unlockedMax = Math.min(WORLDS.length-1, Math.max(unlockedMax, worldIdx+1));
+  localStorage.setItem('br_unlocked', unlockedMax);
+  selWorld = Math.min(WORLDS.length-1, worldIdx+1);
+  quitToMenu();   // later task swaps this for the cutscene
+}
 
 // ---- rarity tiers: lower weight = rarer in the level-up draw (appearance-only) ----
 const RARITY = {
@@ -199,9 +212,10 @@ function resetPlayer(){
   });
 }
 
-function startGame(){
+function startGame(idx){
+  loadWorld(Number.isInteger(idx) ? idx : selWorld);
   initAudio();
-  playMusic('game');
+  playMusic(curTheme.music);
   resetPlayer();
   bullets=[]; ebullets=[]; enemies=[]; gems=[]; parts=[]; texts=[]; zones=[]; holes=[];
   wave=1; score=0; kills=0; elapsed=0; boss=null; combo=0; comboT=0; arena=null; bossPending=0;
@@ -698,10 +712,15 @@ function update(dt){
           bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:6,pierce:1,hit:new Set(),dist:300,dmgMul:0.5}); }
         burst(e.x,e.y,'#bfe6ff',8,180);
       }
-      if(e.isBoss){
+      if(e.isBoss && !curWorld().endless && wave === curWorld().waveTarget){
+        boss=null; arena=null;
+        $('bossbar').classList.add('hidden');
+        ebullets=[];
+        worldCleared(e);            // cutscene path (later task); skip normal drops/reopen
+      } else if(e.isBoss){
         boss=null; arena=null;       // open the field back up
         $('bossbar').classList.add('hidden');
-        playMusic('game'); sfx.win();
+        playMusic(curTheme.music); sfx.win();
         bigText('BOSS DOWN','#4aa3df');
         const bossNum=Math.max(1,Math.floor(wave/5));          // 1st boss=1, 2nd=2, ...
         const nLarge=8+(bossNum-1)*3, nCoin=8+(bossNum-1)*2;    // drops escalate per boss
