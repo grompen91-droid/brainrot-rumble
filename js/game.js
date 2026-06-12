@@ -6,6 +6,8 @@ const P = {}; // player
 let bullets=[], ebullets=[], enemies=[], gems=[], parts=[], texts=[], zones=[], holes=[];
 let wave=1, score=0, kills=0, spawnTimer=0, waveEnemiesLeft=0, betweenWaves=false, boss=null;
 let combo=0, comboT=0;
+// One-time coin reset (2026-06-12): wipe every existing player's gold exactly once.
+if(!localStorage.getItem('br_reset_20260612')){ localStorage.setItem('br_gold','0'); localStorage.setItem('br_reset_20260612','1'); }
 let gold = +(localStorage.getItem('br_gold')||0);   // persistent currency (saved)
 // boss arena: the field locks to a small bounded square a few seconds before the boss arrives
 let arena=null, bossPending=0;
@@ -296,6 +298,7 @@ function startGame(idx){
   initAudio();
   playMusic(curTheme.music);
   resetPlayer();
+  if(typeof equippedDmgMult==='function') P.dmg *= equippedDmgMult();   // equipped gear boosts starting damage
   bullets=[]; ebullets=[]; enemies=[]; gems=[]; parts=[]; texts=[]; zones=[]; holes=[];
   wave=1; score=0; kills=0; elapsed=0; boss=null; combo=0; comboT=0; arena=null; bossPending=0;
   state=ST.PLAY;
@@ -855,7 +858,7 @@ function update(dt){
         playMusic(curTheme.music); sfx.win();
         bigText('BOSS DOWN','#4aa3df');
         const bossNum=Math.max(1,Math.floor(wave/5));          // 1st boss=1, 2nd=2, ...
-        const nLarge=8+(bossNum-1)*3, nCoin=8+(bossNum-1)*2;    // drops escalate per boss
+        const nLarge=8+(bossNum-1)*3, nCoin=2+(bossNum-1);     // coins now scarce; escalate slowly per boss
         for(let g=0; g<nLarge; g++) dropOrb(e.x, e.y, 3, 120, 300);
         for(let g=0; g<nCoin; g++){ const a=rand(0,TAU), s=rand(120,300); gems.push({x:e.x,y:e.y,coin:true,t:rand(0,6),vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
         ebullets=[];
@@ -865,7 +868,7 @@ function update(dt){
         if(e.death && e.death.type==='ring'){ const n=e.death.n||4; for(let k=0;k<n;k++) fireEB(e.x,e.y,k*TAU/n,150,'#e58a3a'); }
         if(e.death && e.death.type==='split') spawnSplit(e);
         dropOrb(e.x, e.y, orbTier(e.xp));
-        if(Math.random()<0.12){ const a=rand(0,TAU), s=rand(90,210); gems.push({x:e.x,y:e.y,coin:true,t:0,vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
+        if(Math.random()<0.03){ const a=rand(0,TAU), s=rand(90,210); gems.push({x:e.x,y:e.y,coin:true,t:0,vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
         if(Math.random()<0.025){ const a=rand(0,TAU), s=rand(90,210); gems.push({x:e.x,y:e.y,heart:true,t:0,vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
       }
       $('scoretag').textContent = '★ '+score;
@@ -913,7 +916,7 @@ function update(dt){
     if(d < (P.r+12)*(P.r+12)){
       gems.splice(i,1);
       if(g.heart){ P.hp=Math.min(P.maxHp,P.hp+25); floatText(P.x,P.y-24,'+25','#e8556a',16); burst(P.x,P.y,'#ff97a6',8,120); sfx.coin(); }
-      else if(g.coin){ const v=Math.round(20*comboMult()*(P.goldMul||1)); score+=v; gold+=v; localStorage.setItem('br_gold',gold); $('scoretag').textContent='★ '+score; floatText(g.x,g.y,'+'+v,'#f5c542',13); sfx.coin(); }
+      else if(g.coin){ const v=Math.round(5*(P.goldMul||1)); score+=v; gold+=v; localStorage.setItem('br_gold',gold); $('scoretag').textContent='★ '+score; floatText(g.x,g.y,'+'+v,'#f5c542',13); sfx.coin(); }
       else { gainXp(g.v); sfx.gem(Math.min(combo,8)); }
     }
   }
@@ -1445,6 +1448,7 @@ function render(){
       const bob=Math.sin(P.walk)*0.06;
       const flip = Math.cos(P.face)<0;
       drawSprite('player', P.x, P.y, P.r*2.6, bob, 0, 0, flip);
+      if(typeof drawPlayerGear==='function') drawPlayerGear(P.x, P.y, P.r*2.6, bob, flip);   // equipped gear overlay
     }
     // Phoenix burn aura
     if(P.burnAura>0){
