@@ -57,6 +57,36 @@ makeSprite('player', 128, (g,u)=>{
   g.strokeStyle=OUT; g.lineWidth=2.2*u; g.beginPath(); g.arc(0,-18*u,5*u,0.15,Math.PI-0.15); g.stroke();
 });
 
+// ---- Gear silhouettes: drawn in player-canvas space so they overlay the survivor.
+//      Base is light gray; tintedSprite() recolors them per rarity at draw time. ----
+const GEARBASE='#cdd2d9';
+// Helmet: dome over the head (head center ~0,-24u) + brim + crest stud.
+makeSprite('gear_helmet', 128, (g,u)=>{
+  sh(g,GEARBASE,3*u,(g)=>{ g.moveTo(-18*u,-24*u); g.arc(0,-24*u,18*u,Math.PI,0,true); g.closePath(); });
+  sh(g,'#b7bdc6',2.6*u,(g)=>{ g.roundRect(-20*u,-25*u,40*u,6*u,3*u); });   // brim
+  dot(g,0,-40*u,2.6*u,'#eef1f5');                                          // crest stud
+});
+// Chestplate: plate over the torso (torso ~ -16u..16u x, -8u..22u y) + shoulders + seam.
+makeSprite('gear_chest', 128, (g,u)=>{
+  sh(g,GEARBASE,3.2*u,(g)=>{ g.roundRect(-18*u,-9*u,36*u,31*u,10*u); });
+  sh(g,'#b7bdc6',2.8*u,(g)=>{ g.ellipse(-16*u,-6*u,7*u,6*u,0,0,TAU); });   // L shoulder
+  sh(g,'#b7bdc6',2.8*u,(g)=>{ g.ellipse(16*u,-6*u,7*u,6*u,0,0,TAU); });    // R shoulder
+  g.strokeStyle=OUT; g.lineWidth=2*u; g.beginPath(); g.moveTo(0,-6*u); g.lineTo(0,20*u); g.stroke();
+});
+// Pants: cover the two legs (legs ~ y16u..36u) + belt across the top.
+makeSprite('gear_pants', 128, (g,u)=>{
+  sh(g,'#b7bdc6',3*u,(g)=>{ g.roundRect(-15*u,13*u,30*u,7*u,3*u); });      // belt
+  sh(g,GEARBASE,3*u,(g)=>{ g.roundRect(-14*u,17*u,11*u,17*u,4*u); });
+  sh(g,GEARBASE,3*u,(g)=>{ g.roundRect(3*u,17*u,11*u,17*u,4*u); });
+});
+// Shoes: chunky boots at the feet (~ y30u..40u).
+makeSprite('gear_shoes', 128, (g,u)=>{
+  sh(g,GEARBASE,3*u,(g)=>{ g.roundRect(-15*u,31*u,13*u,9*u,3*u); });
+  sh(g,GEARBASE,3*u,(g)=>{ g.roundRect(2*u,31*u,13*u,9*u,3*u); });
+  sh(g,'#b7bdc6',2.4*u,(g)=>{ g.rect(-15*u,37*u,13*u,3*u); });            // L sole
+  sh(g,'#b7bdc6',2.4*u,(g)=>{ g.rect(2*u,37*u,13*u,3*u); });             // R sole
+});
+
 // ============================================================
 // BOSSES (iconic)
 // ============================================================
