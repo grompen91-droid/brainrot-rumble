@@ -1368,3 +1368,191 @@ makeSprite('icebearlini', 256, (g,u)=>{
   // arms
   sh(g,'#f3f7fa',4*u,(p)=>{ p.ellipse(-40*u,20*u,11*u,18*u,0.3,0,TAU); p.ellipse(40*u,20*u,11*u,18*u,-0.3,0,TAU); });
 });
+
+// ============================================================
+// WORLD 5 — CIRCO BRAINROTTO : enemy sprites (house-built carnival hybrids)
+// ============================================================
+
+// ---- Burbaloni Dogolini: living balloon dog with a lollipop ----
+makeSprite('burbalonidog', 120, (g,u)=>{
+  // lollipop
+  g.save(); g.translate(28*u,6*u);
+  sh(g,'#c9923f',2*u,(p)=>{ p.rect(-1.5*u,0,3*u,20*u); }); // stick
+  dot(g,0,-2*u,9*u,'#ff5ea8'); g.strokeStyle=OUT; g.lineWidth=2*u; g.beginPath(); g.arc(0,-2*u,9*u,0,TAU); g.stroke();
+  g.strokeStyle='#fff'; g.lineWidth=1.6*u; g.beginPath(); for(let a=0;a<7;a++){ g.arc(0,-2*u,a*1.4*u, a*0.6, a*0.6+1.4); } g.stroke();
+  g.restore();
+  const R='#e8463c';
+  sh(g,R,3*u,(p)=>{ p.ellipse(0,10*u,17*u,12*u,0,0,TAU); }); // body balloon
+  sh(g,R,3*u,(p)=>{ p.ellipse(-2*u,-12*u,12*u,12*u,0,0,TAU); }); // head balloon
+  sh(g,R,2.5*u,(p)=>{ p.ellipse(-15*u,-16*u,5*u,9*u,0.5,0,TAU); p.ellipse(11*u,-18*u,5*u,9*u,-0.5,0,TAU); }); // ear balloons
+  sh(g,R,2.5*u,(p)=>{ for(const lx of [-12,-3,6,14]) p.ellipse(lx*u,22*u,4*u,6*u,0,0,TAU); }); // leg-balloon nubs
+  sh(g,'rgba(255,255,255,0.55)',0,(p)=>{ p.ellipse(-6*u,-16*u,3*u,5*u,0.4,0,TAU); }); // shine
+  eyes(g,u,-2*u,-12*u,5*u,3.4*u);
+  dot(g,-2*u,-6*u,2*u,OUT); // nose
+});
+
+// ---- Popcorrino Bucketto: striped popcorn bucket popping kernels ----
+makeSprite('popcorrino', 120, (g,u)=>{
+  sh(g,'#fff4e0',2.5*u,(p)=>{ for(const kx of [-14,-4,7,15,2,-9]) dot(g,kx*u,(-20-Math.abs(kx)*0.3)*u,5*u,'#fff0c2'); }); // popcorn cloud
+  for(const [kx,ky] of [[-14,-22],[-4,-26],[7,-25],[15,-21],[2,-30],[-9,-24]]) { dot(g,kx*u,ky*u,5*u,'#fff0c2'); g.strokeStyle='#e8c98a'; g.lineWidth=1.4*u; g.beginPath(); g.arc(kx*u,ky*u,5*u,0,TAU); g.stroke(); }
+  sh(g,'#f4f4f4',3*u,(p)=>{ p.moveTo(-16*u,-12*u); p.lineTo(16*u,-12*u); p.lineTo(12*u,26*u); p.lineTo(-12*u,26*u); p.closePath(); }); // bucket
+  g.fillStyle='#e8463c'; for(const sx of [-12,-4,4,12]){ g.beginPath(); g.moveTo(sx*u,-12*u); g.lineTo((sx-2.5)*u,26*u); g.lineTo((sx+1.5)*u,26*u); g.lineTo((sx+3.5)*u,-12*u); g.closePath(); g.fill(); } // red stripes
+  eyes(g,u,0,2*u,7*u,4*u);
+  g.strokeStyle=OUT; g.lineWidth=2*u; g.beginPath(); g.arc(0,12*u,5*u,0.15,Math.PI-0.15); g.stroke(); // smile
+});
+
+// ---- Zucchero Filino: cotton-candy wisp on a paper cone ----
+makeSprite('zuccherofilino', 110, (g,u)=>{
+  sh(g,'#e0a85a',2.5*u,(p)=>{ p.moveTo(-7*u,8*u); p.lineTo(7*u,8*u); p.lineTo(0,30*u); p.closePath(); }); // cone
+  const P='#ff9fd6';
+  for(const [cx,cy,r] of [[-10,-8,11],[9,-8,11],[0,-16,12],[-6,2,9],[7,2,9],[0,-2,11]]) dot(g,cx*u,cy*u,r*u,P);
+  for(const [cx,cy,r] of [[-12,-12,7],[11,-12,7],[0,-22,7]]) dot(g,cx*u,cy*u,r*u,'#ffc1e6'); // fluffy highlights
+  eyes(g,u,0,-6*u,6*u,3.6*u);
+  g.strokeStyle=OUT; g.lineWidth=1.8*u; g.beginPath(); g.arc(0,2*u,4*u,0.15,Math.PI-0.15); g.stroke();
+});
+
+// ---- Clownino Honkhonk: goofy little clown (kid-friendly) ----
+makeSprite('clownino', 120, (g,u)=>{
+  sh(g,'#5aa0e0',2.5*u,(p)=>{ p.ellipse(0,18*u,16*u,12*u,0,0,TAU); }); // body
+  // ruffle collar
+  g.fillStyle='#ffd24a'; for(let i=0;i<9;i++){ const a=Math.PI+ i*Math.PI/8; g.beginPath(); g.arc(Math.cos(a)*16*u,6*u+Math.sin(a)*5*u,5*u,0,TAU); g.fill(); }
+  sh(g,'#fdeede',3*u,(p)=>{ p.ellipse(0,-12*u,15*u,14*u,0,0,TAU); }); // face
+  dot(g,-15*u,-14*u,6*u,'#ff7a3a'); dot(g,15*u,-14*u,6*u,'#ff7a3a'); // hair tufts
+  g.strokeStyle=OUT; g.lineWidth=2*u; g.beginPath(); g.arc(-15*u,-14*u,6*u,0,TAU); g.arc(15*u,-14*u,6*u,0,TAU); g.stroke();
+  dot(g,0,-8*u,4*u,'#e8463c'); // red nose
+  eyes(g,u,0,-16*u,6*u,3.6*u);
+  g.strokeStyle='#e8463c'; g.lineWidth=2.2*u; g.beginPath(); g.arc(0,-6*u,7*u,0.1,Math.PI-0.1); g.stroke(); // big smile
+  sh(g,'#3a78c0',2*u,(p)=>{ p.moveTo(-8*u,-26*u); p.lineTo(0,-40*u); p.lineTo(8*u,-26*u); p.closePath(); }); dot(g,0,-40*u,3*u,'#ffd24a'); // tiny hat
+});
+
+// ---- Cannonino Umano: human-cannonball in a wheeled cannon ----
+makeSprite('cannonino', 120, (g,u)=>{
+  dot(g,-12*u,26*u,7*u,'#3a2a22'); dot(g,12*u,26*u,7*u,'#3a2a22'); // wheels
+  g.save(); g.rotate(-0.5);
+  sh(g,'#4a4f57',3*u,(p)=>{ p.roundRect(-12*u,-6*u,40*u,22*u,8*u); }); // barrel
+  sh(g,'#2f343a',0,(p)=>{ p.ellipse(28*u,5*u,5*u,10*u,0,0,TAU); }); // muzzle hole
+  g.restore();
+  sh(g,'#f0c9a0',3*u,(p)=>{ p.ellipse(8*u,-16*u,11*u,11*u,0,0,TAU); }); // head poking out
+  sh(g,'#e8463c',2.5*u,(p)=>{ p.arc(8*u,-20*u,11*u,Math.PI,TAU); p.closePath(); }); // helmet
+  eyes(g,u,8*u,-15*u,5*u,3.2*u);
+  g.strokeStyle='#ffae42'; g.lineWidth=2*u; g.beginPath(); g.moveTo(-20*u,-2*u); g.lineTo(-26*u,-8*u); g.stroke(); dot(g,-27*u,-9*u,3*u,'#ff7a2a'); // fuse spark
+});
+
+// ---- Giocoliere Scimmino: juggling monkey ----
+makeSprite('giocoliere', 120, (g,u)=>{
+  sh(g,'#8d6240',3*u,(p)=>{ p.ellipse(0,12*u,15*u,16*u,0,0,TAU); }); // body
+  sh(g,'#b98a5e',0,(p)=>{ p.ellipse(0,16*u,9*u,10*u,0,0,TAU); }); // belly
+  sh(g,'#8d6240',2.5*u,(p)=>{ p.moveTo(-12*u,4*u); p.quadraticCurveTo(-24*u,-14*u,-16*u,-22*u); p.lineTo(-12*u,-18*u); p.quadraticCurveTo(-18*u,-10*u,-8*u,2*u); p.closePath(); }); // left arm up
+  sh(g,'#8d6240',2.5*u,(p)=>{ p.moveTo(12*u,4*u); p.quadraticCurveTo(24*u,-14*u,16*u,-22*u); p.lineTo(12*u,-18*u); p.quadraticCurveTo(18*u,-10*u,8*u,2*u); p.closePath(); }); // right arm up
+  sh(g,'#8d6240',3*u,(p)=>{ p.ellipse(0,-14*u,12*u,11*u,0,0,TAU); }); // head
+  sh(g,'#e8c9a0',0,(p)=>{ p.ellipse(0,-11*u,8*u,7*u,0,0,TAU); }); // face
+  dot(g,-12*u,-16*u,4*u,'#8d6240'); dot(g,12*u,-16*u,4*u,'#8d6240'); // ears
+  eyes(g,u,0,-14*u,5*u,3*u);
+  // juggling balls
+  dot(g,-16*u,-28*u,5*u,'#e8463c'); dot(g,0,-34*u,5*u,'#ffd24a'); dot(g,16*u,-28*u,5*u,'#4aa3df');
+  g.strokeStyle=OUT; g.lineWidth=1.6*u; for(const [bx,by] of [[-16,-28],[0,-34],[16,-28]]){ g.beginPath(); g.arc(bx*u,by*u,5*u,0,TAU); g.stroke(); }
+});
+
+// ---- Forzuto Orsino: strongman bear with a barbell ----
+makeSprite('forzutoorsino', 132, (g,u)=>{
+  sh(g,'#8d5a32',3.5*u,(p)=>{ p.ellipse(0,14*u,22*u,20*u,0,0,TAU); }); // body
+  sh(g,'#e8463c',0,(p)=>{ p.moveTo(-10*u,0); p.lineTo(10*u,0); p.lineTo(7*u,28*u); p.lineTo(-7*u,28*u); p.closePath(); }); // singlet
+  sh(g,'#8d5a32',3*u,(p)=>{ p.ellipse(-22*u,6*u,8*u,11*u,0.3,0,TAU); p.ellipse(22*u,6*u,8*u,11*u,-0.3,0,TAU); }); // beefy arms
+  sh(g,'#a06a3c',3.5*u,(p)=>{ p.ellipse(0,-16*u,16*u,14*u,0,0,TAU); }); // head
+  dot(g,-13*u,-26*u,5*u,'#8d5a32'); dot(g,13*u,-26*u,5*u,'#8d5a32'); // ears
+  g.strokeStyle=OUT; g.lineWidth=2.5*u; g.beginPath(); g.arc(-13*u,-26*u,5*u,0,TAU); g.arc(13*u,-26*u,5*u,0,TAU); g.stroke();
+  dot(g,0,-12*u,3*u,OUT); // snout
+  eyes(g,u,0,-20*u,7*u,4*u);
+  g.strokeStyle=OUT; g.lineWidth=2.5*u; g.beginPath(); g.moveTo(-9*u,-9*u); g.quadraticCurveTo(0,-5*u,9*u,-9*u); g.stroke(); // mustache
+  // barbell overhead
+  sh(g,'#5a5f66',3*u,(p)=>{ p.rect(-40*u,-40*u,80*u,5*u); }); // bar
+  sh(g,'#3a3f46',3*u,(p)=>{ p.roundRect(-44*u,-46*u,10*u,18*u,2*u); p.roundRect(34*u,-46*u,10*u,18*u,2*u); }); // weights
+});
+
+// ---- Maestro Foccino: ringmaster seal ----
+makeSprite('maestrofoccino', 120, (g,u)=>{
+  sh(g,'#7d8893',3*u,(p)=>{ p.ellipse(0,12*u,15*u,22*u,0,0,TAU); }); // body upright
+  sh(g,'#9aa6b0',0,(p)=>{ p.ellipse(0,16*u,9*u,15*u,0,0,TAU); }); // belly
+  sh(g,'#7d8893',2.5*u,(p)=>{ p.ellipse(-15*u,12*u,5*u,11*u,0.4,0,TAU); p.ellipse(15*u,12*u,5*u,11*u,-0.4,0,TAU); }); // flippers
+  sh(g,'#7d8893',3*u,(p)=>{ p.ellipse(0,-12*u,12*u,11*u,0,0,TAU); }); // head
+  sh(g,'#5a6470',2*u,(p)=>{ p.moveTo(-3*u,-6*u); p.lineTo(3*u,-6*u); p.lineTo(0,-1*u); p.closePath(); }); // nose
+  g.strokeStyle=OUT; g.lineWidth=1.2*u; for(const s of [-1,1]){ g.beginPath(); g.moveTo(s*3*u,-3*u); g.lineTo(s*14*u,-5*u); g.moveTo(s*3*u,-1*u); g.lineTo(s*14*u,1*u); g.stroke(); } // whiskers
+  eyes(g,u,0,-15*u,5*u,3.4*u);
+  // ringmaster top hat + bowtie
+  sh(g,'#2a2f36',2.5*u,(p)=>{ p.ellipse(0,-22*u,15*u,4*u,0,0,TAU); }); sh(g,'#e8463c',2.5*u,(p)=>{ p.rect(-9*u,-38*u,18*u,16*u); });
+  sh(g,'#2a2f36',0,(p)=>{ p.rect(-9*u,-26*u,18*u,4*u); }); // hat band
+  sh(g,'#ffd24a',2*u,(p)=>{ p.moveTo(0,4*u); p.lineTo(-7*u,0); p.lineTo(-7*u,8*u); p.closePath(); p.moveTo(0,4*u); p.lineTo(7*u,0); p.lineTo(7*u,8*u); p.closePath(); }); // bowtie
+});
+
+// ============================================================
+// WORLD 5 — CIRCO BRAINROTTO : boss sprites (size 256)
+// ============================================================
+
+// ---- Trapezino Volantino: acrobat on a trapeze ----
+makeSprite('trapezino', 256, (g,u)=>{
+  g.strokeStyle='#7a5234'; g.lineWidth=3*u; g.beginPath(); g.moveTo(-30*u,-46*u); g.lineTo(-22*u,-6*u); g.moveTo(30*u,-46*u); g.lineTo(22*u,-6*u); g.stroke(); // ropes
+  sh(g,'#5a3f22',4*u,(p)=>{ p.roundRect(-26*u,-6*u,52*u,6*u,3*u); }); // trapeze bar
+  // acrobat hanging, arms up to bar
+  sh(g,'#f0c9a0',3.5*u,(p)=>{ p.ellipse(0,-14*u,12*u,12*u,0,0,TAU); }); // head
+  sh(g,'#e8463c',4*u,(p)=>{ p.roundRect(-13*u,-2*u,26*u,30*u,8*u); }); // striped torso
+  g.fillStyle='#fdeede'; for(const sy of [4,12,20]){ g.fillRect(-13*u,sy*u,26*u,3*u); } // white stripes
+  sh(g,'#e8463c',3*u,(p)=>{ p.moveTo(-10*u,0); p.lineTo(-22*u,-4*u); p.lineTo(-20*u,2*u); p.closePath(); p.moveTo(10*u,0); p.lineTo(22*u,-4*u); p.lineTo(20*u,2*u); p.closePath(); }); // arms to bar
+  sh(g,'#3a3f6a',3*u,(p)=>{ p.moveTo(-10*u,28*u); p.lineTo(-16*u,46*u); p.lineTo(-8*u,30*u); p.closePath(); p.moveTo(10*u,28*u); p.lineTo(16*u,46*u); p.lineTo(8*u,30*u); p.closePath(); }); // legs/tights pointed
+  eyes(g,u,0,-14*u,8*u,4.5*u);
+  g.strokeStyle=OUT; g.lineWidth=2.5*u; g.beginPath(); g.arc(0,-8*u,5*u,0.15,Math.PI-0.15); g.stroke();
+  dot(g,0,-26*u,4*u,'#ffd24a'); // headband gem
+});
+
+// ---- Giostra Vorticosa: living carousel with a horse ----
+makeSprite('giostra', 256, (g,u)=>{
+  sh(g,'#caa46a',4*u,(p)=>{ p.roundRect(-40*u,34*u,80*u,12*u,4*u); }); // platform
+  g.save(); // striped roof
+  sh(g,'#e8463c',4*u,(p)=>{ p.moveTo(-42*u,-18*u); p.lineTo(0,-48*u); p.lineTo(42*u,-18*u); p.closePath(); });
+  g.fillStyle='#fdeede'; for(let i=-2;i<=2;i++){ g.beginPath(); g.moveTo(i*15*u,-18*u); g.lineTo(i*15*u+6*u,-18*u); g.lineTo(3*u,-46*u); g.lineTo(0,-46*u); g.closePath(); g.fill(); }
+  g.restore();
+  dot(g,0,-50*u,5*u,'#ffd24a'); // finial
+  sh(g,'#ffd24a',3*u,(p)=>{ p.rect(-2.5*u,-18*u,5*u,52*u); }); // center pole
+  // carousel horse
+  g.save(); g.translate(2*u,8*u);
+  sh(g,'#f4f4f4',3.5*u,(p)=>{ p.ellipse(0,4*u,22*u,14*u,0,0,TAU); }); // horse body
+  sh(g,'#f4f4f4',3*u,(p)=>{ p.moveTo(16*u,-2*u); p.quadraticCurveTo(30*u,-8*u,26*u,-20*u); p.lineTo(18*u,-18*u); p.quadraticCurveTo(22*u,-8*u,12*u,-2*u); p.closePath(); }); // neck/head
+  sh(g,'#ff9fd6',2.5*u,(p)=>{ p.moveTo(22*u,-18*u); p.lineTo(14*u,-22*u); p.lineTo(20*u,-10*u); p.closePath(); }); // pink mane
+  sh(g,'#f4f4f4',2.5*u,(p)=>{ for(const lx of [-16,-6,6,14]) p.roundRect(lx*u,14*u,5*u,16*u,2*u); }); // legs
+  dot(g,24*u,-15*u,2.5*u,OUT); // eye
+  g.strokeStyle=OUT; g.lineWidth=2.5*u; g.beginPath(); g.moveTo(2*u,-30*u); g.lineTo(2*u,12*u); g.stroke(); // pole through horse
+  g.restore();
+});
+
+// ---- Mangiafuoco Draghino: fire-eater breathing flame ----
+makeSprite('mangiafuoco', 256, (g,u)=>{
+  sh(g,'#7a4a2a',5*u,(p)=>{ p.ellipse(0,28*u,40*u,30*u,0,0,TAU); }); // burly torso
+  sh(g,'#e8463c',0,(p)=>{ p.roundRect(-10*u,4*u,20*u,40*u,5*u); }); // sash
+  sh(g,'#caa46a',4*u,(p)=>{ p.ellipse(-34*u,18*u,12*u,16*u,0.3,0,TAU); p.ellipse(34*u,18*u,12*u,16*u,-0.3,0,TAU); }); // arms
+  sh(g,'#e0a878',4.5*u,(p)=>{ p.ellipse(0,-14*u,22*u,20*u,0,0,TAU); }); // head
+  // big black beard
+  sh(g,'#2a2420',3*u,(p)=>{ p.moveTo(-20*u,-12*u); p.quadraticCurveTo(-16*u,18*u,0,16*u); p.quadraticCurveTo(16*u,18*u,20*u,-12*u); p.quadraticCurveTo(0,-2*u,-20*u,-12*u); p.closePath(); });
+  eyes(g,u,0,-22*u,8*u,4.5*u);
+  g.strokeStyle=OUT; g.lineWidth=3*u; g.beginPath(); g.moveTo(-18*u,-30*u); g.lineTo(-6*u,-26*u); g.moveTo(6*u,-26*u); g.lineTo(18*u,-30*u); g.stroke(); // brows
+  // flame plume from mouth (upward, within bounds)
+  sh(g,'#ff7a2a',3*u,(p)=>{ p.moveTo(-10*u,-6*u); p.quadraticCurveTo(-14*u,-30*u,0,-46*u); p.quadraticCurveTo(14*u,-30*u,10*u,-6*u); p.closePath(); });
+  sh(g,'#ffd24a',0,(p)=>{ p.moveTo(-5*u,-8*u); p.quadraticCurveTo(-7*u,-26*u,0,-38*u); p.quadraticCurveTo(7*u,-26*u,5*u,-8*u); p.closePath(); });
+  // torch in hand
+  g.save(); g.translate(-40*u,18*u); sh(g,'#7a5234',2.5*u,(p)=>{ p.rect(-2*u,0,4*u,20*u); }); _flame(g,u*0.7,'#ff7a2a','#ffd24a'); g.restore();
+});
+
+// ---- Il Gran Pagliaccio: the Great Ringmaster clown (W5 finale) ----
+makeSprite('granpagliaccio', 256, (g,u)=>{
+  // huge ruffle collar
+  g.fillStyle='#ffd24a'; for(let i=0;i<16;i++){ const a=i*TAU/16; dot(g, Math.cos(a)*30*u, 12*u+Math.sin(a)*16*u, 9*u, i%2?'#ffd24a':'#ff5ea8'); }
+  for(let i=0;i<16;i++){ const a=i*TAU/16; g.strokeStyle=OUT; g.lineWidth=1.6*u; g.beginPath(); g.arc(Math.cos(a)*30*u, 12*u+Math.sin(a)*16*u, 9*u,0,TAU); g.stroke(); }
+  sh(g,'#3a78c0',5*u,(p)=>{ p.ellipse(0,30*u,30*u,24*u,0,0,TAU); }); // coat body
+  sh(g,'#fdeede',5*u,(p)=>{ p.ellipse(0,-16*u,30*u,28*u,0,0,TAU); }); // big face
+  dot(g,-30*u,-18*u,9*u,'#ff7a3a'); dot(g,30*u,-18*u,9*u,'#ff7a3a'); // hair tufts
+  g.strokeStyle=OUT; g.lineWidth=3*u; g.beginPath(); g.arc(-30*u,-18*u,9*u,0,TAU); g.arc(30*u,-18*u,9*u,0,TAU); g.stroke();
+  dot(g,0,-6*u,7*u,'#e8463c'); // red nose
+  eyes(g,u,0,-22*u,12*u,6*u);
+  g.strokeStyle='#e8463c'; g.lineWidth=3.5*u; g.beginPath(); g.arc(0,-8*u,13*u,0.12,Math.PI-0.12); g.stroke(); // grand grin
+  // top hat
+  sh(g,'#2a2f36',4*u,(p)=>{ p.ellipse(0,-40*u,26*u,6*u,0,0,TAU); }); sh(g,'#e8463c',4*u,(p)=>{ p.rect(-16*u,-47*u,32*u,9*u); });
+  sh(g,'#2a2f36',0,(p)=>{ p.rect(-16*u,-40*u,32*u,4*u); }); // hat band
+});

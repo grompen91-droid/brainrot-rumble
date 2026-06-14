@@ -243,6 +243,30 @@ const BOSSES_W4 = [   // original frozen-dessert movesets (keyed on spr in bossM
   { spr:'magotiramisu',    name:'IL MAGO TIRAMISÙ',                hp:300, r:56, phased:true },
   { spr:'icebearlini',     name:'ICE ICE BEARLINI POLARI ORANGINI',hp:430, r:62, phased:true },
 ];
+// ============ WORLD 5 — CIRCO BRAINROTTO roster (house-built carnival hybrids). band 3: tankier, first bounce/teleport gimmicks. ============
+const FOES_W5 = [
+  // Tier I — fodder (one pops into bullets, one splits)
+  { spr:'burbalonidog',   name:'Burbaloni Dogolini',  hp:4,  sp:88,  r:17, xp:1, score:12, death:{type:'ring',n:3} },
+  { spr:'popcorrino',     name:'Popcorrino Bucketto',  hp:5,  sp:74,  r:17, xp:1, score:12, death:{type:'split'} },
+  { spr:'zuccherofilino', name:'Zucchero Filino',      hp:4,  sp:108, r:15, xp:1, score:12 },
+  // Tier II — infantry (two dashers: clown lunge + human-cannonball launch)
+  { spr:'clownino',       name:'Clownino Honkhonk',    hp:8,  sp:80,  r:18, xp:2, score:20, dash:true },
+  { spr:'cannonino',      name:'Cannonino Umano',      hp:10, sp:64,  r:18, xp:2, score:22, dash:true, kb:true },
+  // Tier III — caster (juggler lobs arcing balls)
+  { spr:'giocoliere',     name:'Giocoliere Scimmino',  hp:11, sp:58,  r:19, xp:3, score:28, range:340, shoot:{type:'aim',n:3,cd:3.0,arc:true,col:'#ffd24a'} },
+  // Tier IV — heavy (armored strongman: slam zone + death ring)
+  { spr:'forzutoorsino',  name:'Forzuto Orsino',       hp:34, sp:34,  r:40, xp:5, score:64, front:0.5, death:{type:'ring',n:5},
+    aoe:{r:46,tele:0.55,life:0.7,dps:18,cd:4.0} },
+  // Tier V — elite (ringmaster support: heals nearby + whistle shot)
+  { spr:'maestrofoccino', name:'Maestro Foccino',      hp:22, sp:60,  r:24, xp:4, score:58, support:true,
+    range:300, shoot:{type:'aim',n:2,cd:3.8,spd:130,col:'#e8463c'} },
+];
+const BOSSES_W5 = [   // original carnival movesets; telegraphed melee/zone with bounce/teleport flourishes (band 3)
+  { spr:'trapezino',     name:'TRAPEZINO VOLANTINO',  hp:150, r:54, phased:true },
+  { spr:'giostra',       name:'GIOSTRA VORTICOSA',    hp:215, r:56, phased:true },
+  { spr:'mangiafuoco',   name:'MANGIAFUOCO DRAGHINO', hp:310, r:56, phased:true },
+  { spr:'granpagliaccio',name:'IL GRAN PAGLIACCIO',   hp:450, r:62, phased:true },
+];
 // ---- worlds: each = theme + roster + boss list + wave target (boss wave). ----
 // ---- 10 worlds: gradual difficulty bands (0..9), distinct map shapes, per-world enemy tints. ----
 // Phase 1 reuses the grass roster (W1-5) and dirt roster (W6-10) recolored via enemyTint; dedicated
@@ -267,10 +291,10 @@ const WORLDS = [
     theme:{ void:'#7fb8b0', tile1:'#e2f6ef', tile2:'#cfeae2', tuft:'rgba(120,180,170,0.28)',
             wall:'#a6d6cc', post:'#d6f0e8', postDark:'#6f9f96', bg:'#cfeae2', tint:'#e0fff5', music:'game' },
     foes:FOES_W4, bosses:BOSSES_W4 },
-  { id:'frost', name:'FROSTBITE', band:3, waveTarget:20, endless:false, map:{w:1100,h:3800}, enemyTint:'#9fd0ff',
-    theme:{ void:'#6f9fb5', tile1:'#bfe0ef', tile2:'#aed4e6', tuft:'rgba(110,160,190,0.30)',
-            wall:'#7fa6bc', post:'#a8cfe0', postDark:'#5a7e92', bg:'#b3d8e8', tint:'#9fd0ff', music:'boss2' },
-    foes:FOES_GRASS, bosses:BOSSES_GRASS },
+  { id:'circo', name:'CIRCO BRAINROTTO', band:3, waveTarget:20, endless:false, map:{w:3200,h:2600}, enemyTint:null,
+    theme:{ void:'#9a3b2e', tile1:'#f3e3c0', tile2:'#e7d2a4', tuft:'rgba(150,60,40,0.22)',
+            wall:'#b03a2e', post:'#e8c24a', postDark:'#8a2a20', bg:'#e7d2a4', tint:'#ffcf6b', music:'boss1' },
+    foes:FOES_W5, bosses:BOSSES_W5 },
   { id:'autumn', name:'AUTUMN WOODS', band:4, waveTarget:20, endless:false, map:{w:3000,h:3000}, enemyTint:'#e0792c',
     theme:{ void:'#8a4f22', tile1:'#d98a44', tile2:'#cf7e3a', tuft:'rgba(120,60,20,0.32)',
             wall:null, post:null, bg:'#c97a36', tint:'#e0792c', music:'game' },
@@ -530,6 +554,22 @@ const UPGRADES = [
   { id:'glacierheart', name:'Glacier Heart', icon:'gem', rarity:'epic', cap:1, req:['frostbloom','permafrost'],
     steps:[{desc:'SYNERGY — your frost fields freeze enemies solid, not just slow them.',f:()=>P.glacierHeart=true}] },
 
+  // 🎪 World 5 (CIRCO BRAINROTTO) cards
+  { id:'luckyspin', name:'Lucky Spin', icon:'coin', rarity:'uncommon', cap:5, minWorld:4,
+    steps:[{desc:'+6% chance per level for a JACKPOT hit (double damage).',f:()=>P.jackpot=(P.jackpot||0)+0.06}] },
+  { id:'bouncy', name:'Bouncy Shot', icon:'gembig', rarity:'rare', minWorld:4,
+    steps:[
+      {desc:'your shots bounce off walls once.',f:()=>{P.bounce=Math.max(P.bounce||0,1);}},
+      {desc:'+1 wall bounce.',                  f:()=>{P.bounce=(P.bounce||0)+1;}},
+      {desc:'+1 wall bounce.',                  f:()=>{P.bounce=(P.bounce||0)+1;}},
+      {desc:'+1 wall bounce & larger shots.',   f:()=>{P.bounce=(P.bounce||0)+1;P.bulletR*=1.15;}},
+    ],
+    evo:{name:'Pinball Wizard', icon:'gembig',
+         desc:'EVOLVE — shots ricochet many times around the arena, hitting again each bounce.',
+         f:()=>{P.bounce=(P.bounce||0)+4;P.bulletR*=1.2;P.pinball=true;}} },
+  { id:'showstopper', name:'Showstopper', icon:'coin', rarity:'epic', cap:1, req:['luckyspin','crit'],
+    steps:[{desc:'SYNERGY — JACKPOT hits also critically strike.',f:()=>P.showstopper=true}] },
+
   // ✨ SYNERGY cards — hidden until you own the prerequisite cards (req)
   { id:'frostfire', name:'Frostfire Core', icon:'gem', rarity:'epic', cap:1, req:['slow','nova'],
     steps:[{desc:'SYNERGY — Nova does +120% to frozen foes, who shatter into shards on death.',f:()=>P.frostfire=true}] },
@@ -565,6 +605,8 @@ const CARD_MINWORLD = {
   chain:2, boomerang:2, execute:2, secondwind:2, chainstorm:2,
   // World 4
   permafrost:3, coldblood:3, frostbloom:3, glacierheart:3,
+  // World 5
+  luckyspin:4, bouncy:4, showstopper:4,
 };
 for(const u of UPGRADES){ if(CARD_MINWORLD[u.id]!=null) u.minWorld = CARD_MINWORLD[u.id]; }
 // returns the next card "move" for an upgrade, or null if exhausted
@@ -605,7 +647,9 @@ function resetPlayer(){
     secondWind:0, swCdBase:60, swCd:0,
     // World 4: GELATO GLACIER
     chillHit:0, coldBlood:0,
-    frostBloom:false, frostBloomEvo:false, fbCd:0, fbCdBase:6, fbR:120, fbDps:10, glacierHeart:false
+    frostBloom:false, frostBloomEvo:false, fbCd:0, fbCdBase:6, fbR:120, fbDps:10, glacierHeart:false,
+    // World 5: CIRCO BRAINROTTO
+    jackpot:0, bounce:0, pinball:false, showstopper:false
   });
 }
 
@@ -977,13 +1021,13 @@ function update(dt){
       const base = Math.atan2(best.y-P.y, best.x-P.x), spread = 0.16*(P.spread||1);
       for(let i=0;i<P.shots;i++){
         const a = base + (i-(P.shots-1)/2)*spread;
-        bullets.push({x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.pierce,hit:new Set(),dist:P.range});
+        bullets.push({x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.pierce,hit:new Set(),dist:P.range,bounce:P.bounce||0});
       }
       if(P.radial){                       // Omni-Barrage: 360 ring IN ADDITION (reduced dmg so it stays fair vs crowds)
         const n = clamp(P.shots*2, 8, 20);
         for(let i=0;i<n;i++){
           const a = (i/n)*TAU + elapsed*1.5;
-          bullets.push({x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.pierce,hit:new Set(),dist:P.range,dmgMul:0.6});
+          bullets.push({x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.pierce,hit:new Set(),dist:P.range,dmgMul:0.6,bounce:P.bounce||0});
         }
       }
       sfx.shoot();
@@ -1162,6 +1206,14 @@ function update(dt){
     const b=bullets[i];
     b.dist -= Math.hypot(b.vx,b.vy)*dt;     // range limit
     b.x+=b.vx*dt; b.y+=b.vy*dt;
+    if(b.bounce>0){                          // Bouncy Shot: ricochet off the world walls, re-arming the hit set
+      let bb=false;
+      if(b.x<WALL){ b.x=WALL; b.vx=Math.abs(b.vx); bb=true; }
+      else if(b.x>WORLD.w-WALL){ b.x=WORLD.w-WALL; b.vx=-Math.abs(b.vx); bb=true; }
+      if(b.y<WALL){ b.y=WALL; b.vy=Math.abs(b.vy); bb=true; }
+      else if(b.y>WORLD.h-WALL){ b.y=WORLD.h-WALL; b.vy=-Math.abs(b.vy); bb=true; }
+      if(bb){ b.bounce--; b.dist=Math.max(b.dist,160); if(b.hit) b.hit.clear(); burst(b.x,b.y,'#ffd24a',3,80); }
+    }
     // Boomerang Croc: reverse toward player when range runs out
     if(b.boomerang && b.dist<=0){
       const a=Math.atan2(P.y-b.y,P.x-b.x), spd=b.boomSpd||340;
@@ -1517,6 +1569,11 @@ function damageEnemy(e,dmg,fx,fy,crit){
     if(d<1.2) dmg*=e.front;
   }
   if(P.coldBlood && (e.frz>0 || e.chillT>0)) dmg *= (1 + 0.12*P.coldBlood);   // Cold Blooded: bonus vs chilled/frozen
+  if(P.jackpot && Math.random()<P.jackpot){                                   // Lucky Spin: jackpot double-damage
+    dmg *= 2;
+    if(P.showstopper && !crit){ dmg *= P.critMul; crit=true; }                // Showstopper: jackpots also crit
+    floatText(e.x,e.y-e.r-20,'JACKPOT!','#ffd24a',16);
+  }
   e.hp -= dmg; e.hitT=0.12; e.sq=1;
   if(P.freeze && !e.isBoss) e.frz=1.2;
   if(P.chillHit && !e.isBoss && e.frz<=0) e.chillT = Math.max(e.chillT||0, 0.8 + 0.25*P.chillHit);   // Permafrost: chill-on-hit
@@ -1651,6 +1708,23 @@ function bossMoves(e){
       if(e.vph>=3) return ['FROST_SPIRAL','AVALANCHE_CHARGE','ORANGE_BURST','GLACIER_SLAM','PERMA_RING'];
       if(e.vph>=2) return ['AVALANCHE_CHARGE','ORANGE_BURST','GLACIER_SLAM','PERMA_RING'];
       return ['GLACIER_SLAM','ORANGE_BURST','AVALANCHE_CHARGE'];
+    // ---- World 5 (CIRCO BRAINROTTO) — carnival movesets w/ bounce/teleport flourishes (band 3) ----
+    case 'trapezino':                      // B1: trapeze acrobat
+      if(e.vph>=3) return ['TRAPEZE_SWING','RING_TOSS','HOOP_RING','RING_TOSS'];
+      if(e.vph>=2) return ['TRAPEZE_SWING','RING_TOSS','HOOP_RING'];
+      return ['TRAPEZE_SWING','RING_TOSS'];
+    case 'giostra':                        // B2: living carousel
+      if(e.vph>=3) return ['CAROUSEL_SPIN','HORSE_CHARGE','CALLIOPE_ZONE','HORSE_CHARGE'];
+      if(e.vph>=2) return ['CAROUSEL_SPIN','HORSE_CHARGE','CALLIOPE_ZONE'];
+      return ['HORSE_CHARGE','CALLIOPE_ZONE'];
+    case 'mangiafuoco':                    // B3: fire-eater (bouncing fireballs)
+      if(e.vph>=3) return ['FIRE_JUGGLE','FIRE_BREATH','EMBER_RING','FIRE_BREATH'];
+      if(e.vph>=2) return ['FIRE_BREATH','EMBER_RING','FIRE_JUGGLE'];
+      return ['FIRE_BREATH','EMBER_RING'];
+    case 'granpagliaccio':                 // B4: the Great Ringmaster (W5 finale)
+      if(e.vph>=3) return ['CONFETTI_SPIRAL','BLINK','BALLOON_RING','SUMMON_ACT','BALLOON_RING'];
+      if(e.vph>=2) return ['BLINK','BALLOON_RING','SUMMON_ACT','CONFETTI_SPIRAL'];
+      return ['BALLOON_RING','SUMMON_ACT','BLINK'];
     // ---- World 2 (DIRT DEPTHS) ----
     case 'tatasahur':                      // burrow-slam + marching drum beat
       if(e.vph>=3) return ['DRUM_MARCH','BURROW_DOUBLE','DEBRIS3','aimed5','AIMED_WALL'];
@@ -1712,7 +1786,12 @@ const MOVE_COL = { dash:'#e54d4d', spiral:'#e54d4d', aimed3:'#e23b3b', aimed5:'#
   TORPEDO_DASH:'#9fd0ff', DEPTH_CHARGE:'#7ec8ff', STEAM_RING:'#cfeaff', BUBBLE_VOLLEY:'#9fd0ff',
   FROST_CONE:'#bfe6ff', ICE_FAN:'#7ec8ff', BODY_SLAM:'#a9d6ef', ICE_SUMMON:'#cfeaff',
   ARCANE_RING:'#b388ff', FROST_BOLTS:'#7ec8ff', HEX_FIELD:'#b388ff', CONJURE:'#b388ff', ARCANE_SPIRAL:'#b388ff',
-  GLACIER_SLAM:'#a9d6ef', ORANGE_BURST:'#ff8f2e', AVALANCHE_CHARGE:'#bfe6ff', PERMA_RING:'#7ec8ff', FROST_SPIRAL:'#9fd0ff' };
+  GLACIER_SLAM:'#a9d6ef', ORANGE_BURST:'#ff8f2e', AVALANCHE_CHARGE:'#bfe6ff', PERMA_RING:'#7ec8ff', FROST_SPIRAL:'#9fd0ff',
+  // World 5 (CIRCO BRAINROTTO)
+  TRAPEZE_SWING:'#ffd24a', RING_TOSS:'#ffd24a', HOOP_RING:'#ff5ea8',
+  CAROUSEL_SPIN:'#ffd24a', HORSE_CHARGE:'#e8463c', CALLIOPE_ZONE:'#e8463c',
+  FIRE_BREATH:'#ff7a2a', FIRE_JUGGLE:'#ff7a2a', EMBER_RING:'#ff7a2a',
+  SUMMON_ACT:'#ff5ea8', BALLOON_RING:'#ff5ea8', BLINK:'#ff5ea8', CONFETTI_SPIRAL:'#ffd24a' };
 function pickMove(e){ const pool=bossMoves(e); let m; do{ m=pick(pool); }while(pool.length>1 && m===e.lastMv); e.lastMv=m; return m; }
 // run one move; returns how long the boss stays in the "fire" state before recovering
 function execMove(e){
@@ -1891,6 +1970,38 @@ function execMove(e){
       mRing(e,18,150,'#7ec8ff'); mRingGap(e,14,100,'#9fd0ff',0.30); return 0.3;
     case 'FROST_SPIRAL':
       e.storm=2.2; e.stormN=7; e.stormSpd=120; e.stormStep=0.29; e.stormDir=Math.random()<0.5?1:-1; e.stormCol='#9fd0ff'; e.stormCd=0.13; e.stormTwin=(e.vph>=3); e.stormRainbow=false; sfx.warn(); return 2.2;
+    // ---- W5 moves (CIRCO BRAINROTTO) ----
+    // B1 · Trapezino Volantino (acrobat)
+    case 'TRAPEZE_SWING':
+      e.dst='wind'; e.dwin=e.enraged?0.32:0.48; e.da=Math.atan2(P.y-e.y,P.x-e.x);
+      e.landFx={type:'pounce'}; e.dashTrail={kind:'note',col:'#ffd24a'}; sfx.warn(); return 0.9;
+    case 'RING_TOSS':
+      mAimed(e,5,0.18,150,'#ffd24a'); return 0.2;
+    case 'HOOP_RING':
+      mRingGap(e,16,130,'#ff5ea8',0.30); return 0.3;
+    // B2 · Giostra Vorticosa (carousel)
+    case 'CAROUSEL_SPIN':
+      e.spin=e.vph>=3?1.8:1.4; e.spinCol='#ffd24a'; return e.vph>=3?1.4:1.1;
+    case 'HORSE_CHARGE':
+      e.dst='wind'; e.dwin=e.enraged?0.3:0.5; e.da=Math.atan2(P.y-e.y,P.x-e.x); e.kb=true; e.landFx={type:'pounce'}; sfx.warn(); return 1.0;
+    case 'CALLIOPE_ZONE':
+      for(let k=0;k<4;k++) addZone(P.x+rand(-150,150),P.y+rand(-150,150),52,{tele:0.65,life:0.7,dps:16,col:'#e8463c'}); return 0.4;
+    // B3 · Mangiafuoco Draghino (fire-eater)
+    case 'FIRE_BREATH':
+      { const a=Math.atan2(P.y-e.y,P.x-e.x); for(let l=-1;l<=1;l++) geyserLine(e.x,e.y,a+l*0.32,'#ff7a2a',6,52); sfx.warn(); return 0.45; }
+    case 'FIRE_JUGGLE':
+      e.wd={ n:e.vph>=3?3:2, ang:Math.atan2(P.y-e.y,P.x-e.x), spd:e.enraged?470:410, tT:0, life:2.4 }; sfx.warn(); burst(e.x,e.y,'#ff7a2a',18,300); return 2.4;
+    case 'EMBER_RING':
+      mRingGap(e,18,130,'#ff7a2a',0.28); return 0.3;
+    // B4 · Il Gran Pagliaccio (ringmaster finale)
+    case 'SUMMON_ACT':
+      summonAdds(e,'clownino',3,6); return 0.4;
+    case 'BALLOON_RING':
+      mRing(e,18,150,'#ff5ea8'); mRingGap(e,14,100,'#4aa3df',0.30); return 0.35;
+    case 'BLINK':
+      e.warpT=0.45; burst(e.x,e.y,'#ff5ea8',18,240); return 0.9;
+    case 'CONFETTI_SPIRAL':
+      e.storm=2.2; e.stormN=7; e.stormSpd=125; e.stormStep=0.28; e.stormDir=Math.random()<0.5?1:-1; e.stormCol='#ffd24a'; e.stormCd=0.12; e.stormTwin=(e.vph>=3); e.stormRainbow=true; sfx.warn(); return 2.2;
   }
   return 0.2;
 }
