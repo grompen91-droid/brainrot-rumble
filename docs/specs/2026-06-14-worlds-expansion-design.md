@@ -116,9 +116,9 @@ sluggish but survivable; two tiers behind = a wall. Numbers (base player dmg 10)
   from the flat-gear PR; revisit during playtest.)
 - **Fodder HP** (tier-I base 3 ×HP_MULT 10 = 30) × band → ~30 (W1) … ~144 (W10),
   × softened per-wave growth.
-- **Coins scale per world**: new `worldCoinMul = 1 + band*0.6` folded into coin pickups
-  (`gold += round(5 * goldMul * coinMult() * worldCoinMul)`). W10 pays ~5.4× W1, so
-  grinding W7–9 funds the rares/epics W8–10 demand.
+- **Coins scale per world**: new `worldCoinMul = 1 + band*0.22` folded into coin pickups
+  (`gold += round(5 * goldMul * coinMult() * worldCoinMul)`). Gentle ramp — W10 pays ~3× W1
+  (nerfed from 6.4×), so grinding later worlds is worthwhile without trivializing the gear grind.
 - **Prices rescaled** so the next tier ≈ "one world of grinding": common ~30, uncommon
   ~120, rare ~450, epic ~1500, legendary ~4500 (each ~3–4× the last). Crate prices
   scale similarly.
