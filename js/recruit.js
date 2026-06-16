@@ -92,7 +92,7 @@ function _weeklyResetStr() {
 // ---- Character Shop data ----
 function getCharDailyShop() {
   const seed=dailyCharSeed();
-  const pool=CHARACTERS.filter(c=>c.rarity!=='world'&&c.rarity!=='legendary');
+  const pool=CHARACTERS.filter(c=>c.rarity!=='world'&&c.rarity!=='legendary'&&c.rarity!=='challenger');
   // Use mulberry32/hashStr from shop.js (loaded after recruit.js at runtime)
   const rng=mulberry32(hashStr(String(seed)));
   const shuffled=pool.slice();

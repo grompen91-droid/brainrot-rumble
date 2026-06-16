@@ -484,8 +484,7 @@ const CHARACTERS = [
     id: 'soldier',
     name: 'Soldier',
     desc: 'Fast, solid bullets, can\'t aim while moving.',
-    rarity: 'world',
-    worldUnlock: null,
+    rarity: 'challenger',
     chalWorldUnlock: 1,   // unlocked by beating Challenger World 1
     baseStats: { speed: 280 },   // 200 * 1.4
     register() {
@@ -595,12 +594,12 @@ function charIsUnlocked(charId) {
   const char = CHARACTERS.find(c=>c.id===charId);
   if(!char) return false;
   if(char.rarity==='world'){
-    if(char.chalWorldUnlock!=null){
-      const ch = parseInt(localStorage.getItem('br_ch_unlocked')||'0');
-      return ch >= char.chalWorldUnlock;
-    }
     const unlocked = parseInt(localStorage.getItem('br_unlocked')||'0');
     return char.worldUnlock!=null && char.worldUnlock<=unlocked;
+  }
+  if(char.rarity==='challenger'){
+    const ch = parseInt(localStorage.getItem('br_ch_unlocked')||'0');
+    return char.chalWorldUnlock!=null && ch >= char.chalWorldUnlock;
   }
   return isCharOwned(charId);
 }

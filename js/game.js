@@ -900,7 +900,7 @@ function chalWorldCleared(e){
   }
   const newChars = typeof CHARACTERS!=='undefined'
     ? CHARACTERS.filter(c=>{
-        if(c.rarity!=='world') return false;
+        if(c.rarity!=='world' && c.rarity!=='challenger') return false;
         const owned = typeof isCharOwned==='function' && isCharOwned(c.id);
         const hadStory  = c.worldUnlock!=null    && c.worldUnlock<=prevChalUnlocked;
         const hadChal   = c.chalWorldUnlock!=null && c.chalWorldUnlock<=prevChalUnlocked;
@@ -934,8 +934,9 @@ function startBossArena(){
   sfx.warn();
 }
 
+function spawnRingDist(){ return Math.max(W,H)/Math.max(zoom,0.0001)*0.62 + 80; }   // world-space ring radius; scales with viewport so it stays off-screen on wide/zoomed-out monitors
 function ringPos(){ // spawn point on a ring around player, clamped to world
-  const a = rand(0,TAU), d = Math.max(W,H)*0.62 + 80;
+  const a = rand(0,TAU), d = spawnRingDist();
   return { x: clamp(P.x+Math.cos(a)*d, WALL+30, WORLD.w-WALL-30),
            y: clamp(P.y+Math.sin(a)*d, WALL+30, WORLD.h-WALL-30) };
 }
@@ -1105,6 +1106,25 @@ function drawBoomerangCroc(b){
   // eye
   cx.fillStyle='#fff'; cx.beginPath(); cx.arc(s*0.7,-s*0.18,s*0.12,0,TAU); cx.fill();
   cx.fillStyle='#0d3b22'; cx.beginPath(); cx.arc(s*0.72,-s*0.18,s*0.06,0,TAU); cx.fill();
+  cx.restore();
+}
+
+function drawKnifeBullet(b){
+  const r=b.r, ang=Math.atan2(b.vy,b.vx);
+  cx.save(); cx.translate(b.x,b.y);
+  cx.globalAlpha=0.45; cx.strokeStyle='#fff6bf'; cx.lineWidth=2.5;
+  cx.beginPath(); cx.arc(0,0,r*1.6,0,TAU); cx.stroke();
+  cx.globalAlpha=1; cx.rotate(ang);
+  // blade, tip leads in direction of travel (outward)
+  cx.fillStyle='#e8eaf0'; cx.strokeStyle='#5a5f6b'; cx.lineWidth=1.6;
+  cx.beginPath(); cx.moveTo(r*2.1,0); cx.lineTo(r*0.5,r*0.5); cx.lineTo(r*0.5,-r*0.5); cx.closePath();
+  cx.fill(); cx.stroke();
+  cx.strokeStyle='#aeb4c0'; cx.lineWidth=1; cx.beginPath(); cx.moveTo(r*1.8,0); cx.lineTo(r*0.6,0); cx.stroke();
+  // crossguard
+  cx.fillStyle='#caa12f'; cx.strokeStyle='#5a4313'; cx.lineWidth=1.4;
+  cx.beginPath(); cx.rect(r*0.3,-r*0.55,r*0.25,r*1.1); cx.fill(); cx.stroke();
+  // hilt
+  cx.fillStyle='#8a5d2c'; cx.beginPath(); cx.rect(-r*0.9,-r*0.22,r*1.0,r*0.44); cx.fill(); cx.stroke();
   cx.restore();
 }
 
@@ -1351,7 +1371,7 @@ function update(dt){
     if(P.knifeCd<=0){ P.knifeCd = P.knifeCdBase;
       const n=P.knifeN||8, off=elapsed*2.2, br=(P.knifeBig?9:6)*(P.bulletR||1), spd=480*(P.bulletSpd||1);
       for(let i=0;i<n;i++){ const a=off+i*TAU/n;
-        bullets.push({x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.knifeEvo?999:(P.pierce+1),hit:new Set(),dist:P.range*0.9,dmgMul:0.7}); }
+        bullets.push({x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.knifeEvo?999:(P.pierce+1),hit:new Set(),dist:P.range*0.9,dmgMul:0.7,knife:true}); }
       sfx.shoot();
     }
   }
@@ -1691,7 +1711,7 @@ function update(dt){
   // --- enemies ---
   // Challenger: cull enemies that wandered too far — they respawn around the player via normal spawn budget
   if(gameMode==='challenger' && !chalBossActive){
-    const CULL_DSQ = 1800*1800;
+    const cullD = spawnRingDist()+400, CULL_DSQ = cullD*cullD;   // must stay well beyond the spawn ring or wide/zoomed-out screens cull enemies the instant they spawn
     for(let i=enemies.length-1;i>=0;i--){
       const e=enemies[i];
       if(e && !e.isBoss && dist2(e.x,e.y,P.x,P.y)>CULL_DSQ) enemies.splice(i,1);
@@ -3171,6 +3191,7 @@ function render(){
   for(const b of bullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     if(b.boom){ drawBoomerangCroc(b); continue; }
+    if(b.knife){ drawKnifeBullet(b); continue; }
     if(b.lucky){
       if(b.luckyCrit){ cx.filter='grayscale(1) contrast(1.1)'; drawSprite('luckyblock',b.x,b.y,b.r*7,0,0,0,false,null); cx.filter='none'; }
       else drawSprite('luckyblock',b.x,b.y,b.r*5,0,0,0,false,null);
