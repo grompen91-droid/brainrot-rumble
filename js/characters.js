@@ -412,14 +412,16 @@ const CHARACTERS = [
   {
     id: 'zio_schermo',
     name: 'Zio Schermo',
-    desc: 'Starts each wave with a 1-hit shield. Shield recharges 8s after breaking. +15% armor.',
+    desc: 'Glass cannon: white bullets, +100% damage, +25% fire rate. 1 HP — no HP/healing cards.',
     rarity: 'epic',
     worldUnlock: null,
-    baseStats: { armor:0.85 },
+    baseStats: { maxHp:1, dmg:20, fireRate:0.24 },
     register() {
-      onHook('waveStart', () => {
-        if(typeof P!=='undefined') P.shield=Math.max(P.shield||0,1);
-      });
+      if(typeof P!=='undefined'){
+        P.whiteBullets = true;
+        P.bannedCards = ['hp','thick','regen'];   // no max-HP or healing cards — stays at 1 HP
+        P.maxHp = 1; P.hp = 1;   // hard clamp — gear HP bonuses apply before register(), so re-clamp here
+      }
     },
     draw(ctx, size, t) { _drawZioSchermo(ctx, size, t); }
   },

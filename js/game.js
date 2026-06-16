@@ -856,7 +856,7 @@ function resetPlayer(){
     fortunatoLuckyCap:5,
     trueDmg:false,
     soldierStill:false, soldierBullets:false,
-    noCards:false
+    noCards:false, whiteBullets:false
   });
 }
 
@@ -3248,8 +3248,8 @@ function render(){
   }
 
   // --- player bullets: bright gold with a white halo = YOURS ---
-  const bcore = P.railgun ? '#5fe6ff' : P.soldierBullets ? '#1a1a22' : '#ffd21f';
-  const bhi   = P.railgun ? '#dafcff' : P.soldierBullets ? '#44444e' : '#fff6bf';
+  const bcore = P.railgun ? '#5fe6ff' : P.soldierBullets ? '#1a1a22' : P.whiteBullets ? '#ffffff' : '#ffd21f';
+  const bhi   = P.railgun ? '#dafcff' : P.soldierBullets ? '#44444e' : P.whiteBullets ? '#bcdcff' : '#fff6bf';
   for(const b of bullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     if(b.boom){ drawBoomerangCroc(b); continue; }
