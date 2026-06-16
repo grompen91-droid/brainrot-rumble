@@ -551,7 +551,7 @@ const UPGRADES = [
   // passives
   { id:'dmg',    name:'Brute Force',     icon:'coin',     rarity:'common', cap:5, steps:[{desc:'+25% damage.',          f:()=>P.dmg*=1.25}] },
   { id:'rate',   name:'Adrenaline Rush', icon:'gem',      rarity:'common', cap:5, steps:[{desc:'+18% attack speed.',    f:()=>P.fireRate*=0.82}] },
-  { id:'static', name:'Static Charge',  icon:'gem',      rarity:'common', cap:5, steps:[{desc:'+10% attack speed.',    f:()=>P.fireRate*=0.90}] },
+  { id:'static', name:'Static Charge',  icon:'gem',      rarity:'common', cap:5, minWorld:1, steps:[{desc:'+10% attack speed.',    f:()=>P.fireRate*=0.90}] },
   { id:'speed',  name:'Fleet Footed',    icon:'heart',    rarity:'common', cap:5, steps:[{desc:'+12% movement speed.',  f:()=>P.speed*=1.12}] },
   { id:'hp',     name:'Vitality Essence',icon:'heart',    rarity:'common', cap:5, steps:[{desc:'+25 max HP, full heal.',f:()=>{P.maxHp+=25;P.hp=P.maxHp;}}] },
   { id:'magnet', name:'Magnetic Pulse',  icon:'gem',      rarity:'common', cap:5, steps:[{desc:'+40% item pickup radius.',f:()=>P.magnet*=1.4}] },
@@ -559,6 +559,7 @@ const UPGRADES = [
   { id:'regen',  name:'Regeneration',    icon:'heart',    rarity:'common', cap:5, steps:[{desc:'recover +1 HP / second.',f:()=>P.regen+=1}] },
   { id:'heavy',  name:'Heavy Rounds',    icon:'coin',     rarity:'common', cap:5, steps:[{desc:'+15% bullet size & +8% projectile speed.',f:()=>{P.bulletR*=1.15;P.bulletSpd*=1.08;}}] },
   { id:'thick',  name:'Thick Skin',      icon:'heart',    rarity:'common', cap:5, steps:[{desc:'+15 max HP.',           f:()=>P.maxHp+=15}] },
+  { id:'luckycharm', name:'Lucky Charm', icon:'coin',     rarity:'common', cap:5, minWorld:0, steps:[{desc:'+5% crit chance (3x dmg).',f:()=>P.crit=Math.min(0.8,P.crit+0.05)}] },
   { id:'crit',   name:'Critical Strike', icon:'coin',     rarity:'uncommon',cap:5,steps:[{desc:'+10% crit chance (3x dmg).',f:()=>P.crit=Math.min(0.8,P.crit+0.10)}] },
   { id:'dashcd', name:'Quick Reflexes',  icon:'tralalero',rarity:'uncommon',cap:5,steps:[{desc:'dash cooldown -20%.',   f:()=>P.dashMax*=0.8}] },
   { id:'critdmg',name:'Killer Instinct', icon:'coin',     rarity:'uncommon',cap:5,steps:[{desc:'+0.5x critical damage.',f:()=>P.critMul+=0.5}] },
