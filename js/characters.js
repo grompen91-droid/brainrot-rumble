@@ -293,13 +293,15 @@ const CHARACTERS = [
   {
     id: 'fortunato',
     name: 'Fortunato',
-    desc: 'Lucky blocks spawn 4 per wave. 10% chance each block is a heavy block (+50 HP & double XP on pop).',
+    desc: 'More lucky blocks, more RNG.',
     rarity: 'world',
     worldUnlock: 3,
     baseStats: {},
     register() {
       onHook('getLuckyCap', () => 4);
       onHook('onLuckySpawn', (lb) => { if(Math.random()<0.10) lb.heavy=true; });
+      P.luckyBullets = true;
+      P.noCrit = true;
     },
     draw(ctx, size, t) { _drawFortunato(ctx, size, t); }
   },

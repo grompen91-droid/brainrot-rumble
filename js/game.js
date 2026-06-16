@@ -68,6 +68,7 @@ function spawnLuckyBatch(n=2){           // up to n blocks, capped at n
     const hp = 6*HP_MULT*(1+(wave-1)*0.12);
     const lb = { x,y, r:26, hp, maxHp:hp, t:rand(0,TAU), hitT:0, sq:0 };
     if(typeof fireHook==='function') fireHook('onLuckySpawn', lb);
+    if(!lb.heavy && Math.random()<0.01) lb.heavy=true;
     luckies.push(lb);
   }
 }
@@ -1218,7 +1219,9 @@ function update(dt){
       for(let i=0;i<P.shots;i++){
         const a = base + (i-(P.shots-1)/2)*spread;
         const po = (P.seeker && P.shots>1) ? (i-(P.shots-1)/2)*15 : 0;  // 15px apart so homing shots are visually distinct
-        bullets.push({x:P.x+Math.cos(perpA)*po,y:P.y+Math.sin(perpA)*po,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.pierce,hit:new Set(),dist:P.range,bounce:P.bounce||0,homing:P.seeker||0});
+        let lkCrit=false;
+        if(P.luckyBullets){ const cc=P.crit+(P.overdrive?(P.frenzy||0)*0.001:0)+(P.foeClose?0.09*(P.daredevil||0):0); lkCrit=Math.random()<cc; }
+        bullets.push({x:P.x+Math.cos(perpA)*po,y:P.y+Math.sin(perpA)*po,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.pierce,hit:new Set(),dist:P.range,bounce:P.bounce||0,homing:P.seeker||0,lucky:P.luckyBullets||false,luckyCrit:lkCrit});
       }
       if(P.radial){                       // Omni-Barrage: 360 ring IN ADDITION (reduced dmg so it stays fair vs crowds)
         const n = clamp(P.shots*2, 8, 20);
@@ -1434,9 +1437,10 @@ function update(dt){
       for(const e of arr){
         if(b.hit.has(e) || e.iv>0) continue;
         if(dist2(b.x,b.y,e.x,e.y) < (e.r+b.r)*(e.r+b.r)){
-          const critC = P.crit + (P.overdrive ? (P.frenzy||0)*0.001 : 0) + (P.foeClose ? 0.09*P.daredevil : 0);   // Overdrive: frenzy stacks add crit; Daredevil: point-blank crit
-          const isCrit = Math.random()<critC;
-          const dmg = P.dmg * (b.dmgMul||1) * (P.abyssalMul||1) * (1 + (P.frenzy||0)*0.002) * (isCrit?(P.critMul||3):1);   // Killing Frenzy +0.2%/stack; Abyssal Pact swarm bonus
+          const critC = P.crit + (P.overdrive ? (P.frenzy||0)*0.001 : 0) + (P.foeClose ? 0.09*(P.daredevil||0) : 0);
+          const isCrit = b.luckyCrit ? true : (P.noCrit ? false : Math.random()<critC);
+          const rngMul = P.noCrit ? (0.5+Math.random()*0.75) : 1;
+          const dmg = P.dmg * (b.dmgMul||1) * (P.abyssalMul||1) * (1 + (P.frenzy||0)*0.002) * (isCrit?(P.critMul||3):1) * rngMul;
           b.hit.add(e);
           hitSpark(b.x,b.y,isCrit?'#ffe14d':'#ff9f3a',isCrit);
           damageEnemy(e,dmg,b.x,b.y,isCrit);
@@ -1491,8 +1495,9 @@ function update(dt){
       for(const lb of luckies){
         if(b.hit.has(lb)) continue;
         if(dist2(b.x,b.y,lb.x,lb.y) < (lb.r+b.r)*(lb.r+b.r)){
-          const isCrit = Math.random() < (P.crit + (P.overdrive ? (P.frenzy||0)*0.001 : 0));
-          const dmg = P.dmg * (b.dmgMul||1) * (P.abyssalMul||1) * (1 + (P.frenzy||0)*0.002) * (isCrit?(P.critMul||3):1);
+          const isCrit = b.luckyCrit ? true : (P.noCrit ? false : Math.random()<(P.crit+(P.overdrive?(P.frenzy||0)*0.001:0)));
+          const rngMul = P.noCrit ? (0.5+Math.random()*0.75) : 1;
+          const dmg = P.dmg * (b.dmgMul||1) * (P.abyssalMul||1) * (1 + (P.frenzy||0)*0.002) * (isCrit?(P.critMul||3):1) * rngMul;
           b.hit.add(lb);
           hitSpark(b.x,b.y,isCrit?'#ffe14d':'#ff9f3a',isCrit);
           damageLucky(lb,dmg,b.x,b.y,isCrit);
@@ -2886,10 +2891,15 @@ function render(){
   const bhi   = P.railgun ? '#dafcff' : '#fff6bf';
   for(const b of bullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
-    if(b.boom){ drawBoomerangCroc(b); continue; }                                       // spinning croc boomerang = clearly YOURS
-    cx.fillStyle='#fff'; cx.beginPath(); cx.arc(b.x,b.y,b.r+2,0,TAU); cx.fill();        // white rim
-    cx.fillStyle=bcore; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();           // core
-    cx.fillStyle=bhi; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.4,0,TAU); cx.fill(); // highlight
+    if(b.boom){ drawBoomerangCroc(b); continue; }
+    if(b.lucky){
+      if(b.luckyCrit){ cx.filter='grayscale(1) contrast(1.1)'; drawSprite('luckyblock',b.x,b.y,b.r*3.4,0,0,0,false,null); cx.filter='none'; }
+      else drawSprite('luckyblock',b.x,b.y,b.r*2.4,0,0,0,false,null);
+      continue;
+    }
+    cx.fillStyle='#fff'; cx.beginPath(); cx.arc(b.x,b.y,b.r+2,0,TAU); cx.fill();
+    cx.fillStyle=bcore; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
+    cx.fillStyle=bhi; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.4,0,TAU); cx.fill();
   }
 
   // --- orbs ---
