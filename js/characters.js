@@ -450,6 +450,7 @@ const CHARACTERS = [
     baseStats: { dmg:30, fireRate:1.6, maxHp:60, range:480, gearDmgMul:1.5 },
     register() {
       P.bannedCards = (P.bannedCards||[]).concat(['shots']);
+      P.trueDmg = true;
       onHook('onLevelUp', () => { if(typeof P!=='undefined') P.shots=1; });
     },
     draw(ctx, size, t) { _drawIlCecchino(ctx, size, t); }

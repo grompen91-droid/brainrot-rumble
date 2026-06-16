@@ -793,7 +793,8 @@ function resetPlayer(){
     luckyBullets:false, noCrit:false, luckyXpOnly:false, luckyBlockDmgMul:1, gearDmgMul:1,
     hasMagnetPet:false,
     bannedCards:null,
-    fortunatoLuckyCap:5
+    fortunatoLuckyCap:5,
+    trueDmg:false
   });
 }
 
@@ -1878,7 +1879,7 @@ function update(dt){
 function damageEnemy(e,dmg,fx,fy,crit){
   if(e.iv>0 || e.under) return;      // shelled / invulnerable / burrowed
   if(e.lead){ damageEnemy(e.lead,dmg,fx,fy,crit); e.hitT=0.12; e.sq=1; return; }  // duo partner routes to the lead's shared HP
-  if(e.front!=null && fx!=null){     // frontal armor: hits from the player-facing arc are softened
+  if(!P.trueDmg && e.front!=null && fx!=null){     // frontal armor: hits from the player-facing arc are softened
     const toSrc=Math.atan2(fy-e.y,fx-e.x), toP=Math.atan2(P.y-e.y,P.x-e.x);
     let d=Math.abs(((toSrc-toP+Math.PI)%TAU+TAU)%TAU-Math.PI);
     if(d<1.2) dmg*=e.front;
