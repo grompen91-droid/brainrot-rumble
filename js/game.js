@@ -2858,10 +2858,12 @@ function render(){
   for(const lb of luckies){
     if(lb.x<vx0-60||lb.x>vx1+60||lb.y<vy0-60||lb.y>vy1+60) continue;
     const bob=Math.sin(lb.t*3)*4, wob=Math.sin(lb.t*2)*0.05;
-    cx.fillStyle='rgba(40,60,25,0.28)'; cx.beginPath(); cx.ellipse(lb.x,lb.y+lb.r*0.9,lb.r*0.8,lb.r*0.3,0,0,TAU); cx.fill();
-    cx.globalAlpha=0.5; cx.strokeStyle='#ffe88a'; cx.lineWidth=2; cx.setLineDash([6,6]);   // faint glow ring marks it as a target
-    cx.beginPath(); cx.arc(lb.x,lb.y+bob,lb.r+8,0,TAU); cx.stroke(); cx.setLineDash([]); cx.globalAlpha=1;
+    cx.fillStyle=lb.heavy?'rgba(10,10,10,0.35)':'rgba(40,60,25,0.28)'; cx.beginPath(); cx.ellipse(lb.x,lb.y+lb.r*0.9,lb.r*0.8,lb.r*0.3,0,0,TAU); cx.fill();
+    cx.globalAlpha=0.5; cx.strokeStyle=lb.heavy?'#e0e0e0':'#ffe88a'; cx.lineWidth=lb.heavy?3:2; cx.setLineDash([6,6]);
+    cx.beginPath(); cx.arc(lb.x,lb.y+bob,lb.r+(lb.heavy?12:8),0,TAU); cx.stroke(); cx.setLineDash([]); cx.globalAlpha=1;
+    if(lb.heavy) cx.filter='grayscale(1) contrast(1.1)';
     drawSprite('luckyblock', lb.x, lb.y+bob, lb.r*(lb.heavy?3.4:2.6), wob, lb.sq, lb.hitT, false, null);
+    if(lb.heavy) cx.filter='none';
     if(lb.hp<lb.maxHp){
       const w=lb.r*1.9;
       cx.fillStyle='rgba(0,0,0,0.45)'; cx.fillRect(lb.x-w/2,lb.y-lb.r-12,w,5);
