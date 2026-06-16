@@ -603,16 +603,16 @@ const UPGRADES = [
     evo:{name:'Chain Reaction', icon:'gembig', desc:'EVOLVE — ricochets reach far and hit much harder.', f:()=>{P.ricochet+=2;P.ricochetEvo=true;}} },
 
   // 🌿 World 3 (FORESTA FRUTOSA) cards
-  { id:'chain', name:'Rizz Chain', icon:'gembig', rarity:'rare', minWorld:2,
+  { id:'chain', name:'Explosive Shot', icon:'gembig', rarity:'rare', minWorld:2,
     steps:[
-      {desc:'shots chain-arc to 1 nearby enemy (60% dmg).',f:()=>{P.chain=(P.chain||0)+1;}},
-      {desc:'chains to 2 nearby enemies.',                  f:()=>{P.chain=(P.chain||0)+1;}},
-      {desc:'chains to 3 nearby enemies (70% dmg).',        f:()=>{P.chain=(P.chain||0)+1;}},
-      {desc:'chains to 4 nearby enemies (75% dmg).',        f:()=>{P.chain=(P.chain||0)+1;}},
+      {desc:'Ignites enemies on hit (3s fire, 10% dmg/tick).',  f:()=>{P.chain=(P.chain||0)+1;}},
+      {desc:'Fire spreads to 1 nearby enemy on ignition.',       f:()=>{P.chain=(P.chain||0)+1;}},
+      {desc:'Fire spreads to 2 nearby enemies.',                 f:()=>{P.chain=(P.chain||0)+1;}},
+      {desc:'Fire spreads to 3 nearby enemies.',                 f:()=>{P.chain=(P.chain||0)+1;}},
     ],
-    evo:{name:'Infinite Rizz', icon:'gembig',
-         desc:'EVOLVE — chains bounce to every enemy in range + heal 0.5 HP per bounce.',
-         f:()=>{P.chain=(P.chain||0)+2; P.chainEvo=true; P.chainHeal=(P.chainHeal||0)+0.5;}} },
+    evo:{name:'Wildfire', icon:'gembig',
+         desc:'EVOLVE — fire spreads to ALL nearby enemies and burns for 5s.',
+         f:()=>{P.chain=(P.chain||0)+2; P.chainEvo=true;}} },
 
   { id:'boomerang', name:'Boomerang Croc', icon:'crocodilo', rarity:'epic', minWorld:2,
     steps:[
@@ -639,7 +639,7 @@ const UPGRADES = [
 
   // ✨ W3 synergy
   { id:'chainstorm', name:'Chain Storm', icon:'gembig', rarity:'epic', cap:1, req:['chain','nova'],
-    steps:[{desc:'SYNERGY — each Rizz Chain bounce also detonates a mini nova burst.',
+    steps:[{desc:'SYNERGY — each Explosive Shot ignition also detonates a fire ring burst.',
             f:()=>P.chainNova=true}] },
 
   // ❄️ World 4 (GELATO GLACIER) cards
@@ -1474,32 +1474,21 @@ function update(dt){
             forEnemiesNear(b.x,b.y,R,(o)=>{ if(o===e||o.iv>0||o.under||o.lead) return; if(dist2(b.x,b.y,o.x,o.y)<R*R){ o.hp-=sd; o.hitT=Math.max(o.hitT,0.05); } });
             parts.push({x:b.x,y:b.y,vx:0,vy:0,life:0.18,max:0.18,color:'#caa15a',r:R,ring:true,gr:R*2.4});
           }
-          // Rizz Chain: arc to nearby foes after hit (not on ricochet bullets)
-          if(P.chain>0 && !b.ric){
-            const maxChain=P.chainEvo?999:P.chain;
-            const dmgMul=P.chainEvo?0.8:(P.chain>=4?0.75:P.chain>=3?0.70:0.60);
-            const chainHits=new Set([e]); let lastX=b.x, lastY=b.y;
-            if(P.chainEvo){
-              for(const o of enemies){ if(chainHits.has(o)||o.under||o.iv>0) continue;
-                if(dist2(lastX,lastY,o.x,o.y)<280*280){ chainHits.add(o);
-                  damageEnemy(o,dmg*dmgMul,lastX,lastY,false);
-                  parts.push({x:(lastX+o.x)/2,y:(lastY+o.y)/2,vx:0,vy:0,life:0.18,max:0.18,color:'#a0f0c0',r:4});
-                  if(P.chainHeal>0) P.hp=Math.min(P.maxHp,P.hp+P.chainHeal);
-                  if(P.chainNova) parts.push({x:o.x,y:o.y,vx:0,vy:0,life:0.25,max:0.25,color:'#fff',r:22,ring:true});
-                }
-              }
-            } else {
-              for(let ci=0;ci<maxChain;ci++){
-                let best=null, bestD=280*280;
-                for(const o of enemies){ if(chainHits.has(o)||o.under||o.iv>0) continue;
-                  const d=dist2(lastX,lastY,o.x,o.y); if(d<bestD){bestD=d;best=o;} }
-                if(!best) break;
-                chainHits.add(best);
-                damageEnemy(best,dmg*dmgMul,lastX,lastY,false);
-                parts.push({x:(lastX+best.x)/2,y:(lastY+best.y)/2,vx:0,vy:0,life:0.18,max:0.18,color:'#a0f0c0',r:4});
-                if(P.chainHeal>0) P.hp=Math.min(P.maxHp,P.hp+P.chainHeal);
-                if(P.chainNova) parts.push({x:best.x,y:best.y,vx:0,vy:0,life:0.25,max:0.25,color:'#fff',r:22,ring:true});
-                lastX=best.x; lastY=best.y;
+          // Explosive Shot: ignite on hit, spread to nearby enemies
+          if(P.chain>0 && !b.ric && !e.fire && !(e.fireImmune>0)){
+            const fireDmg = P.dmg*(b.dmgMul||1)*0.10;
+            const fireDur = P.chainEvo?5:3;
+            e.fire={dur:fireDur,dmg:fireDmg,tickCd:0.5};
+            burst(e.x,e.y,'#ff6a00',10,180);
+            if(P.chainNova) parts.push({x:e.x,y:e.y,vx:0,vy:0,life:0.3,max:0.3,color:'#ff6a00',r:60,ring:true,gr:320});
+            const spreadN=P.chainEvo?999:P.chain-1;
+            let sp=0;
+            for(const o of enemies){
+              if(sp>=spreadN||o===e||o.iv>0||o.under||o.fire||(o.fireImmune>0)) continue;
+              if(dist2(e.x,e.y,o.x,o.y)<200*200){
+                o.fire={dur:fireDur*0.8,dmg:fireDmg*0.8,tickCd:0.5};
+                burst(o.x,o.y,'#ff6a00',5,120);
+                sp++;
               }
             }
           }
@@ -1540,7 +1529,19 @@ function update(dt){
     if(e.hitT>0) e.hitT-=dt;
     if(e.sq>0) e.sq-=dt*4;
     if(e.frz>0) e.frz-=dt;
-    if(e.chillT>0) e.chillT-=dt;   // Permafrost partial slow
+    if(e.chillT>0) e.chillT-=dt;
+    if((e.fireImmune||0)>0) e.fireImmune-=dt;
+    if(e.fire){
+      e.fire.dur-=dt; e.fire.tickCd-=dt;
+      if(e.fire.tickCd<=0){
+        e.fire.tickCd=0.5;
+        e.hp-=e.fire.dmg; e.hitT=Math.max(e.hitT,0.06);
+        floatText(e.x,e.y-e.r-4,Math.round(e.fire.dmg),'#ff6a00',11);
+        if(P.chainHeal>0) P.hp=Math.min(P.maxHp,P.hp+P.chainHeal);
+      }
+      if(Math.random()<dt*10) parts.push({x:e.x+rand(-e.r*.5,e.r*.5),y:e.y-e.r*.2,vx:rand(-18,18),vy:rand(-90,-35),life:.38,max:.38,color:Math.random()<.5?'#ff6a00':'#ffcc00',r:rand(2,5)});
+      if(e.fire.dur<=0){ e.fire=null; e.fireImmune=1; }
+    }
 
     if(e.isBoss){
       updateBoss(e,dt);
@@ -2969,7 +2970,8 @@ function render(){
     drawSprite(e.spr, e.x, e.y, e.r*2.5*(e.deathScale||1), wob, e.sq, e.hitT, e.face===-1, e.isBoss?null:curWorld().enemyTint);   // per-world enemy recolor
     if(e.cut){ cx.globalAlpha = 1; }
     if(e.frz>0){ cx.globalAlpha=0.4; cx.fillStyle='#bfe6ff'; cx.beginPath(); cx.arc(e.x,e.y,e.r*1.05,0,TAU); cx.fill(); cx.globalAlpha=1; }
-    else if(e.chillT>0){ cx.globalAlpha=0.22; cx.fillStyle='#bfe6ff'; cx.beginPath(); cx.arc(e.x,e.y,e.r*1.05,0,TAU); cx.fill(); cx.globalAlpha=1; }   // Permafrost chill tint
+    else if(e.chillT>0){ cx.globalAlpha=0.22; cx.fillStyle='#bfe6ff'; cx.beginPath(); cx.arc(e.x,e.y,e.r*1.05,0,TAU); cx.fill(); cx.globalAlpha=1; }
+    if(e.fire){ cx.globalAlpha=0.38; cx.fillStyle='#ff6a00'; cx.beginPath(); cx.arc(e.x,e.y,e.r*1.08,0,TAU); cx.fill(); cx.globalAlpha=1; }
     if(e.iv>0){ cx.strokeStyle='#d8b46a'; cx.lineWidth=4; cx.globalAlpha=0.85; cx.beginPath(); cx.arc(e.x,e.y,e.r+6,0,TAU); cx.stroke(); cx.globalAlpha=1; }
     if(e.hp<e.maxHp){
       const w=e.r*1.9;
