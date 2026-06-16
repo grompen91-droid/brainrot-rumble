@@ -74,7 +74,6 @@ function spawnLuckyBatch(n=2){           // up to n blocks, capped at n
 }
 function damageLucky(lb,dmg,fx,fy,crit){
   lb.hp -= dmg; lb.hitT=0.12; lb.sq=1; sfx.hit();
-  floatText(lb.x,lb.y-lb.r-4, Math.round(dmg), crit?'#ffd23a':'#fff', crit?18:13);
 }
 // burst the block open and scatter its reward: heal heart / magnet / 3 gold gems
 function popLucky(lb){
