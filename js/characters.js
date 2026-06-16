@@ -81,29 +81,6 @@ function _drawFortunato(ctx, size, t) {
   ctx.restore();
 }
 
-function _drawBombardella(ctx, size, t) {
-  t = t||0;
-  const lw=Math.max(1.5,size*0.038);
-  // Humanoid base: dark red pants, red armored chest, red arms, reddish skin
-  _humanBase(ctx, size, '#6a1515', '#c03838', '#cc4040', '#d85858');
-  // Angry brows
-  ctx.strokeStyle='#2a1c10'; ctx.lineWidth=Math.max(2,size*0.045);
-  ctx.beginPath(); ctx.moveTo(-size*0.14,-size*0.30); ctx.lineTo(-size*0.04,-size*0.26); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo( size*0.14,-size*0.30); ctx.lineTo( size*0.04,-size*0.26); ctx.stroke();
-  _eyes(ctx, size);
-  // Fire spikes on head (outer)
-  ctx.fillStyle='#ff6a00'; ctx.strokeStyle='#2a1c10'; ctx.lineWidth=Math.max(1.5,size*0.032);
-  for(const ox of [-size*0.10, 0, size*0.10]){
-    ctx.beginPath(); ctx.moveTo(ox,-size*0.46); ctx.lineTo(ox-size*0.055,-size*0.34); ctx.lineTo(ox+size*0.055,-size*0.34); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-  }
-  // Inner yellow flame tips
-  ctx.fillStyle='#ffd24a';
-  for(const ox of [-size*0.10, 0, size*0.10]){
-    ctx.beginPath(); ctx.moveTo(ox,-size*0.43); ctx.lineTo(ox-size*0.024,-size*0.37); ctx.lineTo(ox+size*0.024,-size*0.37); ctx.closePath(); ctx.fill();
-  }
-}
-
 function _drawSorellaVeloce(ctx, size, t) {
   t = t||0;
   const lw=Math.max(1.5,size*0.038);
@@ -146,34 +123,6 @@ function _drawZioSchermo(ctx, size, t) {
   ctx.beginPath(); ctx.roundRect(-size*0.14,-size*0.27,size*0.28,size*0.09,size*0.03);
   ctx.fillStyle='#1a2430'; ctx.fill(); ctx.strokeStyle='#2a1c10'; ctx.lineWidth=lw; ctx.stroke();
   ctx.fillStyle='rgba(80,180,255,0.25)'; ctx.beginPath(); ctx.roundRect(-size*0.14,-size*0.27,size*0.28,size*0.09,size*0.03); ctx.fill();
-}
-
-function _drawDoppione(ctx, size, t) {
-  t = t||0;
-  const lw=Math.max(1.5,size*0.038);
-  // Left half (white) humanoid
-  ctx.save(); ctx.beginPath(); ctx.rect(-size,-size,size,size*2); ctx.clip();
-  _humanBase(ctx, size, '#e0e0e0', '#f0f0f0', '#f0f0f0', '#f0f0f0');
-  ctx.restore();
-  // Right half (black) humanoid
-  ctx.save(); ctx.beginPath(); ctx.rect(0,-size,size,size*2); ctx.clip();
-  _humanBase(ctx, size, '#1a1a1a', '#222222', '#222222', '#1a1a1a');
-  ctx.restore();
-  // Re-stroke outlines (clipping strips them)
-  ctx.strokeStyle='#2a1c10'; ctx.lineWidth=lw;
-  for(const [x,y,w,h,r] of [
-    [-size*0.12,size*0.16,size*0.09,size*0.20,size*0.03],
-    [ size*0.03,size*0.16,size*0.09,size*0.20,size*0.03],
-    [-size*0.16,-size*0.08,size*0.32,size*0.28,size*0.10],
-    [-size*0.23,-size*0.02,size*0.09,size*0.18,size*0.04],
-    [ size*0.14,-size*0.02,size*0.09,size*0.18,size*0.04],
-  ]){ ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.stroke(); }
-  ctx.beginPath(); ctx.ellipse(0,-size*0.24,size*0.16,size*0.15,0,0,Math.PI*2); ctx.stroke();
-  // Center dividing line
-  ctx.beginPath(); ctx.moveTo(0,-size*0.5); ctx.lineTo(0,size*0.5); ctx.lineWidth=Math.max(2,size*0.04); ctx.stroke();
-  // Contrasting eyes
-  ctx.fillStyle='#1a1a1a'; ctx.beginPath(); ctx.arc(-size*0.07,-size*0.24,size*0.035,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#f0f0f0'; ctx.beginPath(); ctx.arc( size*0.07,-size*0.24,size*0.035,0,Math.PI*2); ctx.fill();
 }
 
 function _drawSoldier(ctx, size, t) {
@@ -367,7 +316,8 @@ const CHARACTERS = [
     name: 'Fortunato',
     desc: 'More lucky blocks, more RNG. Can one-tap any lucky block.',
     rarity: 'epic',
-    worldUnlock: 2,   // unlocked by beating World 2
+    worldUnlock: null,
+    gemPrice: 25,     // Character Shop only — no progression unlock
     baseStats: { maxHp:70, speed:230, fireRate:0.46, dmg:12, gearDmgMul:1.0 },
     register() {
       P.fortunatoLuckyCap = 5 + Math.floor(Math.random()*4); // 5-8, fixed for the run
@@ -379,23 +329,6 @@ const CHARACTERS = [
       P.luckyBlockDmgMul = 2.5;
     },
     draw(ctx, size, t) { _drawFortunato(ctx, size, t); }
-  },
-  {
-    id: 'bombardella',
-    name: 'Bombardella',
-    desc: '+40% dmg, -35 HP. Every 10 kills per wave: +1 temp projectile.',
-    rarity: 'rare',
-    worldUnlock: null,
-    baseStats: { dmg:14, maxHp:65 },
-    register() {
-      onHook('waveStart', () => { if(typeof P!=='undefined'){ P.waveKills=0; P.bonusShots=0; } });
-      onHook('onKill', () => {
-        if(typeof P==='undefined') return;
-        P.waveKills=(P.waveKills||0)+1;
-        if(P.waveKills%10===0){ P.bonusShots=(P.bonusShots||0)+1; }
-      });
-    },
-    draw(ctx, size, t) { _drawBombardella(ctx, size, t); }
   },
   {
     id: 'sorella_veloce',
@@ -415,6 +348,7 @@ const CHARACTERS = [
     desc: 'Way higher stats, one HP.',
     rarity: 'epic',
     worldUnlock: null,
+    gemPrice: 10,
     baseStats: { maxHp:1, dmg:20, fireRate:0.24 },
     register() {
       if(typeof P!=='undefined'){
@@ -424,20 +358,6 @@ const CHARACTERS = [
       }
     },
     draw(ctx, size, t) { _drawZioSchermo(ctx, size, t); }
-  },
-  {
-    id: 'doppione',
-    name: 'Doppione',
-    desc: 'Each upgrade card picked creates a ghost copy at 40% value.',
-    rarity: 'epic',
-    worldUnlock: null,
-    baseStats: {},
-    register() {
-      onHook('onCardPick', () => {
-        if(typeof P!=='undefined') P.ghostCopyChance=0.40;
-      });
-    },
-    draw(ctx, size, t) { _drawDoppione(ctx, size, t); }
   },
   {
     id: 'la_strega',
@@ -457,8 +377,9 @@ const CHARACTERS = [
     id: 'il_professore',
     name: 'Il Professore',
     desc: 'XP range x2. Start each wave 20% full. Draw 4 cards at level-up.',
-    rarity: 'world',
-    worldUnlock: 7,
+    rarity: 'epic',
+    worldUnlock: null,
+    gemPrice: 25,     // Character Shop only — no progression unlock
     baseStats: { magnet:180 },
     register() {
       onHook('waveStart', () => {

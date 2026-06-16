@@ -111,10 +111,11 @@ function getCharWeeklyShop() {
   return shuffled[0];
 }
 const CHAR_SHOP_PRICE={ rare:50, epic:100, legendary:150, common:20 };
+function charGemPrice(char){ return char.gemPrice!=null ? char.gemPrice : (CHAR_SHOP_PRICE[char.rarity]||50); }
 let charShopDailyIdx=0;
 function buyCharacter(id) {
   const char=CHARACTERS.find(c=>c.id===id); if(!char) return;
-  const price=CHAR_SHOP_PRICE[char.rarity]||50;
+  const price=charGemPrice(char);
   if(isCharOwned(id)){ alert('Already owned'); return; }
   if(!spendGems(price)){ alert('Not enough gems!'); return; }
   grantChar(id);
@@ -178,7 +179,7 @@ function renderShopCharSection() {
   // ---- WEEKLY LEGENDARY (tall vertical card) ----
   if(weekly){
     const owned=isCharOwned(weekly.id);
-    const price=CHAR_SHOP_PRICE[weekly.rarity]||150;
+    const price=charGemPrice(weekly);
     const poor=gemBalance<price;
     const resetStr=_weeklyResetStr();
     html+='<div class="scard weeklycard weeklycard-v">';
@@ -198,7 +199,7 @@ function renderShopCharSection() {
     if(charShopDailyIdx>=daily.length) charShopDailyIdx=0;
     const card=daily[charShopDailyIdx];
     const owned=isCharOwned(card.id);
-    const price=CHAR_SHOP_PRICE[card.rarity]||50;
+    const price=charGemPrice(card);
     const poor=gemBalance<price;
     const rarLabel=(typeof RAR!=='undefined'&&RAR[card.rarity])?RAR[card.rarity].name:card.rarity.toUpperCase();
     html+='<div class="charcarousel">';
@@ -342,7 +343,7 @@ function initRecruitUI(container) {
       const card=daily[charShopDailyIdx]; if(!card) return;
       const gem='<span class="gemico-sm">◆</span>';
       const owned=isCharOwned(card.id);
-      const price=CHAR_SHOP_PRICE[card.rarity]||50;
+      const price=charGemPrice(card);
       const poor=gemBalance<price;
       const rarLabel=(typeof RAR!=='undefined'&&RAR[card.rarity])?RAR[card.rarity].name:card.rarity.toUpperCase();
       let html='<div class="charcarousel-card scard r-'+card.rarity+(dir===1?' caro-slide-right':dir===-1?' caro-slide-left':'')+'">';
