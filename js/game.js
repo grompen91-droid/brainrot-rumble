@@ -49,6 +49,8 @@ function saveGold(){ localStorage.setItem('br_gold', gold); localStorage.setItem
 // boss arena: the field locks to a small bounded square a few seconds before the boss arrives
 let arena=null, bossPending=0;
 const ARENA_SIZE=1000, ARENA_LEAD=4, ARENA_ZOOM=1.3;
+const CHAL_ARENA_MUL=1.6;                          // challenger boss arenas are roomier than story mode
+const FINAL_ARENA_GROW=1.5, CHAL_FINAL_ARENA_GROW=2.2;   // phase-3 arena growth factor; challenger gets an even bigger blowout
 const FINAL_CHARGE=2.6;   // seconds a final boss spends invincible & still before its phase-3 onslaught
 const BOSS_WIND=0.9;      // boss attack wind-up: how long the telegraph shows before the move fires
 // XP orb tiers (index = tier). Enemies drop one orb; tier scales with their xp value.
@@ -924,7 +926,8 @@ function chalWorldCleared(e){
 // lock the field into a small bounded arena around the player; boss arrives after a delay
 function startBossArena(){
   // arena fits inside the world even in thin corridors (clamped to map width/height)
-  const aw = Math.min(ARENA_SIZE, WORLD.w-2*WALL), ah = Math.min(ARENA_SIZE, WORLD.h-2*WALL);
+  const arenaSize = ARENA_SIZE * (gameMode==='challenger' ? CHAL_ARENA_MUL : 1);
+  const aw = Math.min(arenaSize, WORLD.w-2*WALL), ah = Math.min(arenaSize, WORLD.h-2*WALL);
   const cxw = clamp(P.x, WALL+aw/2, WORLD.w-WALL-aw/2);
   const cyw = clamp(P.y, WALL+ah/2, WORLD.h-WALL-ah/2);
   arena = { x:cxw-aw/2, y:cyw-ah/2, w:aw, h:ah };
@@ -2694,7 +2697,8 @@ function startFinalCharge(e){
 function expandFinalArena(e){
   if(!arena) return;
   const cx0=arena.x+arena.w/2, cy0=arena.y+arena.h/2;
-  const naw=Math.min(arena.w*1.5, WORLD.w-2*WALL), nah=Math.min(arena.h*1.5, WORLD.h-2*WALL);
+  const grow = gameMode==='challenger' ? CHAL_FINAL_ARENA_GROW : FINAL_ARENA_GROW;
+  const naw=Math.min(arena.w*grow, WORLD.w-2*WALL), nah=Math.min(arena.h*grow, WORLD.h-2*WALL);
   const ncx=clamp(cx0,WALL+naw/2,WORLD.w-WALL-naw/2), ncy=clamp(cy0,WALL+nah/2,WORLD.h-WALL-nah/2);
   arena={x:ncx-naw/2,y:ncy-nah/2,w:naw,h:nah};
 }
