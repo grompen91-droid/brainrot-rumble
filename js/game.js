@@ -1511,7 +1511,7 @@ function update(dt){
         if(dist2(b.x,b.y,lb.x,lb.y) < (lb.r+b.r)*(lb.r+b.r)){
           const isCrit = b.luckyCrit ? true : (P.noCrit ? false : Math.random()<(P.crit+(P.overdrive?(P.frenzy||0)*0.001:0)));
           const rngMul = P.noCrit ? (0.5+Math.random()*0.75) : 1;
-          const dmg = P.dmg * (b.dmgMul||1) * (P.abyssalMul||1) * (1 + (P.frenzy||0)*0.002) * (isCrit?(P.critMul||3):1) * rngMul;
+          const dmg = P.dmg * (b.dmgMul||1) * (P.abyssalMul||1) * (1 + (P.frenzy||0)*0.002) * (isCrit?(P.critMul||3):1) * rngMul * (P.luckyBlockDmgMul||1);
           b.hit.add(lb);
           hitSpark(b.x,b.y,isCrit?'#ffe14d':'#ff9f3a',isCrit);
           damageLucky(lb,dmg,b.x,b.y,isCrit);

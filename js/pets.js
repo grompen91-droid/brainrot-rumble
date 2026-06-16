@@ -465,11 +465,17 @@ const PETS = [
   {
     id: 'calamita',
     name: 'Calamita',
-    desc: 'Triples magnet range permanently. Every wave start: pulls all pickups for 3s.',
+    desc: 'At wave start: vacuums all pickups toward you for 3s.',
     rarity: 'rare',
     register() {
-      if(typeof P!=='undefined'){ P.magnet*=3; P.hasMagnetPet=true; }
-      onHook('waveStart', () => { if(typeof P!=='undefined') P.magnetT=3; });
+      if(typeof P!=='undefined') P.hasMagnetPet=true;
+      let pullT=0;
+      onHook('waveStart', () => { pullT=3; });
+      onHook('petTick', (dt) => {
+        if(pullT<=0||typeof gems==='undefined') return;
+        pullT-=dt;
+        for(const g of gems) g.vac=true;
+      });
     },
     draw(ctx, size, t) { _drawCalamita(ctx, size, t); }
   },
