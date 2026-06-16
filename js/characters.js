@@ -176,6 +176,31 @@ function _drawDoppione(ctx, size, t) {
   ctx.fillStyle='#f0f0f0'; ctx.beginPath(); ctx.arc( size*0.07,-size*0.24,size*0.035,0,Math.PI*2); ctx.fill();
 }
 
+function _drawSoldier(ctx, size, t) {
+  t = t||0;
+  const lw = Math.max(1.5, size*0.038);
+  // Humanoid base: dark olive pants, army vest, olive arms, tan skin
+  _humanBase(ctx, size, '#3a4a22', '#4a5e28', '#4a5e28', '#c8a47a');
+  // Belt
+  _fillR(ctx,size,'#2a1c10',-size*0.17,size*0.10,size*0.34,size*0.05,size*0.01);
+  _fillR(ctx,size,'#a08030',-size*0.04,size*0.09,size*0.08,size*0.055,size*0.01);  // buckle
+  // Stern angled brows
+  ctx.strokeStyle='#2a1c10'; ctx.lineWidth=Math.max(2,size*0.042); ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-size*0.12,-size*0.29); ctx.lineTo(-size*0.04,-size*0.26); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( size*0.12,-size*0.29); ctx.lineTo( size*0.04,-size*0.26); ctx.stroke();
+  ctx.lineCap='butt';
+  _eyes(ctx, size, -0.22);
+  // Helmet dome
+  ctx.beginPath(); ctx.ellipse(0,-size*0.26,size*0.17,size*0.15,0,0,Math.PI*2);
+  ctx.fillStyle='#3d4e22'; ctx.fill(); ctx.strokeStyle='#2a1c10'; ctx.lineWidth=lw; ctx.stroke();
+  // Helmet brim strip
+  _fillR(ctx,size,'#2e3a18',-size*0.22,-size*0.185,size*0.44,size*0.07,size*0.02);
+  // Chin strap
+  ctx.strokeStyle='#2a3618'; ctx.lineWidth=Math.max(1.5,size*0.03);
+  ctx.beginPath(); ctx.moveTo(-size*0.16,-size*0.22); ctx.lineTo(-size*0.16,-size*0.11); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo( size*0.16,-size*0.22); ctx.lineTo( size*0.16,-size*0.11); ctx.stroke();
+}
+
 function _drawLaStrega(ctx, size, t) {
   t = t||0;
   const lw=Math.max(1.5,size*0.038);
@@ -456,6 +481,33 @@ const CHARACTERS = [
     draw(ctx, size, t) { _drawIlCecchino(ctx, size, t); }
   },
   {
+    id: 'soldier',
+    name: 'Soldier',
+    desc: 'Stands still to unleash — 50% faster attack speed while still. Moves 40% faster but cannot shoot while moving.',
+    rarity: 'world',
+    worldUnlock: null,
+    chalWorldUnlock: 1,   // unlocked by beating Challenger World 1
+    baseStats: { speed: 280 },   // 200 * 1.4
+    register() {
+      P.soldierBullets = true;
+      let wasStill = true;
+      let lx = P.x, ly = P.y;
+      onHook('petTick', () => {
+        const moved = Math.abs(P.x - lx) > 0.8 || Math.abs(P.y - ly) > 0.8;
+        lx = P.x; ly = P.y;
+        const nowStill = !moved;
+        if(nowStill !== wasStill){
+          if(nowStill)  P.fireRate /= 1.5;   // standing still: 50% faster
+          else          P.fireRate *= 1.5;   // moving: restore rate
+          wasStill = nowStill;
+        }
+        P.soldierStill = nowStill;
+        if(!nowStill) P.fireCd = Math.max(P.fireCd, 0.4);   // block shooting while moving
+      });
+    },
+    draw(ctx, size, t) { _drawSoldier(ctx, size, t); }
+  },
+  {
     id: 'il_campione',
     name: 'Il Campione',
     desc: '12% enemy death = mini lucky block. Each boss killed permanently +2 base dmg.',
@@ -543,8 +595,12 @@ function charIsUnlocked(charId) {
   const char = CHARACTERS.find(c=>c.id===charId);
   if(!char) return false;
   if(char.rarity==='world'){
+    if(char.chalWorldUnlock!=null){
+      const ch = parseInt(localStorage.getItem('br_ch_unlocked')||'0');
+      return ch >= char.chalWorldUnlock;
+    }
     const unlocked = parseInt(localStorage.getItem('br_unlocked')||'0');
-    return char.worldUnlock<=unlocked;
+    return char.worldUnlock!=null && char.worldUnlock<=unlocked;
   }
   return isCharOwned(charId);
 }

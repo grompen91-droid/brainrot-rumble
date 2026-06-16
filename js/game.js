@@ -816,7 +816,8 @@ function resetPlayer(){
     hasMagnetPet:false,
     bannedCards:null,
     fortunatoLuckyCap:5,
-    trueDmg:false
+    trueDmg:false,
+    soldierStill:false, soldierBullets:false
   });
 }
 
@@ -899,9 +900,14 @@ function chalWorldCleared(e){
   }
   const newChars = typeof CHARACTERS!=='undefined'
     ? CHARACTERS.filter(c=>{
-        if(c.rarity!=='world'||c.worldUnlock==null) return false;
-        const hadBefore=c.worldUnlock<=prevChalUnlocked||(typeof isCharOwned==='function'&&isCharOwned(c.id));
-        return !hadBefore&&c.worldUnlock<=chalUnlocked;
+        if(c.rarity!=='world') return false;
+        const owned = typeof isCharOwned==='function' && isCharOwned(c.id);
+        const hadStory  = c.worldUnlock!=null    && c.worldUnlock<=prevChalUnlocked;
+        const hadChal   = c.chalWorldUnlock!=null && c.chalWorldUnlock<=prevChalUnlocked;
+        if(owned||hadStory||hadChal) return false;
+        const nowStory  = c.worldUnlock!=null    && c.worldUnlock<=chalUnlocked;
+        const nowChal   = c.chalWorldUnlock!=null && c.chalWorldUnlock<=chalUnlocked;
+        return nowStory || nowChal;
       })
     : [];
   _clearData={ worldNum:worldIdx+1, coins:worldCoins, gems:gemsEarned, newChars, isChallenger:true };
@@ -3160,8 +3166,8 @@ function render(){
   }
 
   // --- player bullets: bright gold with a white halo = YOURS ---
-  const bcore = P.railgun ? '#5fe6ff' : '#ffd21f';      // evolved Railgun shots glow cyan
-  const bhi   = P.railgun ? '#dafcff' : '#fff6bf';
+  const bcore = P.railgun ? '#5fe6ff' : P.soldierBullets ? '#1a1a22' : '#ffd21f';
+  const bhi   = P.railgun ? '#dafcff' : P.soldierBullets ? '#44444e' : '#fff6bf';
   for(const b of bullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     if(b.boom){ drawBoomerangCroc(b); continue; }
@@ -3311,6 +3317,18 @@ function render(){
     if(P.burnAura>0){
       cx.globalAlpha=0.12+0.05*Math.sin(elapsed*8); cx.fillStyle='#ff7a3a';
       cx.beginPath(); cx.arc(P.x,P.y,80,0,TAU); cx.fill(); cx.globalAlpha=1;
+    }
+    // Soldier stand-still boost indicator — pulsing red ring
+    if(P.soldierBullets && P.soldierStill){
+      const pulse=0.5+0.5*Math.sin(elapsed*9);
+      cx.globalAlpha=0.22+0.18*pulse;
+      const rg=cx.createRadialGradient(P.x,P.y,P.r*0.4,P.x,P.y,P.r+18+pulse*5);
+      rg.addColorStop(0,'rgba(255,40,40,0)'); rg.addColorStop(0.55,'rgba(255,40,40,0.65)'); rg.addColorStop(1,'rgba(255,40,40,0)');
+      cx.fillStyle=rg; cx.beginPath(); cx.arc(P.x,P.y,P.r+24+pulse*5,0,TAU); cx.fill();
+      cx.globalAlpha=0.85; cx.strokeStyle='#ff2020'; cx.lineWidth=2+pulse;
+      cx.setLineDash([7,5]); cx.lineDashOffset=-elapsed*42;
+      cx.beginPath(); cx.arc(P.x,P.y,P.r+13,0,TAU); cx.stroke();
+      cx.setLineDash([]); cx.globalAlpha=1;
     }
     // Aegis shield bubble (one ring per remaining charge)
     if(P.shield>0){
