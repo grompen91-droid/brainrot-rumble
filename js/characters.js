@@ -412,7 +412,7 @@ const CHARACTERS = [
   {
     id: 'zio_schermo',
     name: 'Zio Schermo',
-    desc: 'Glass cannon: white bullets, +100% damage, +25% fire rate. 1 HP — no HP/healing cards.',
+    desc: 'Way higher stats, one HP.',
     rarity: 'epic',
     worldUnlock: null,
     baseStats: { maxHp:1, dmg:20, fireRate:0.24 },
