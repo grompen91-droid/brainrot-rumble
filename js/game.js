@@ -1925,8 +1925,9 @@ function update(dt){
       chalLuckyT = P.luckyXpOnly ? 7 : 12;   // Fortunato: every 7s; others every 12s
       if(luckies.length < chalLuckyCap){
         const n = chalLuckyCap - luckies.length;
+        const offEdge = Math.hypot(W,H)/(2*zoom);   // world units to the viewport edge diagonal
         for(let k=0;k<n;k++){
-          const a=rand(0,TAU), d=rand(320,650);
+          const a=rand(0,TAU), d=offEdge+rand(60,220);   // just off screen in all cases
           const x=P.x+Math.cos(a)*d, y=P.y+Math.sin(a)*d;
           const hp=5*HP_MULT*(1+(wave-1)*0.10);
           const lb={x,y,r:26,hp,maxHp:hp,t:rand(0,TAU),hitT:0,sq:0};
@@ -1970,7 +1971,7 @@ function update(dt){
     if(d < (P.r+12)*(P.r+12)){
       gems.splice(i,1);
       if(g.heart){ const h=g.heal||(g.big?50:25); P.hp=Math.min(P.maxHp,P.hp+h); floatText(P.x,P.y-24,'+'+h,'#e8556a',g.big?20:16); burst(P.x,P.y,'#ff97a6',g.big?14:8,140); sfx.coin(); }
-      else if(g.coin){ const v=Math.round(5*(P.goldMul||1)*coinMult()*worldCoinMul()*(gameMode==='challenger'?2.5:1)); gold+=v; worldCoins+=v; saveGold(); if(window.markDirty) window.markDirty(); setCoinHUD(); floatText(g.x,g.y,'+'+v,'#f5c542',13); sfx.coin(); }
+      else if(g.coin){ const v=Math.round(5*(P.goldMul||1)*coinMult()*worldCoinMul()*(gameMode==='challenger'?Math.min(3.5,1.3+worldIdx*0.3):1)); gold+=v; worldCoins+=v; saveGold(); if(window.markDirty) window.markDirty(); setCoinHUD(); floatText(g.x,g.y,'+'+v,'#f5c542',13); sfx.coin(); }
       else if(g.magnet){ for(const o of gems) o.vac=true; floatText(P.x,P.y-24,'MAGNET','#9fe0ff',16); burst(P.x,P.y,'#9fe0ff',12,160); sfx.level(); }   // pull in every pickup on the map
       else { gainXp(g.v); sfx.gem(2); }
     }
