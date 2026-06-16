@@ -96,8 +96,9 @@ function popLucky(lb){
     } else {          // waves 15+: gold orbs, 3-8
       tier=4; n=3+Math.floor(Math.random()*6);
     }
+    if(lb.heavy) n=Math.min(n*2, 16);   // heavy block: double orbs for Fortunato
     for(let g=0;g<n;g++){ const a=rand(0,TAU),s=rand(100,260); gems.push({x:lb.x,y:lb.y,tier,v:ORB[tier].v,t:rand(0,6),vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
-    floatText(lb.x,lb.y-lb.r-10,'+'+n+' XP!','#ffd23a',18);
+    floatText(lb.x,lb.y-lb.r-10,(lb.heavy?'HEAVY ':'')+'+ '+n+' XP!',lb.heavy?'#ff9c1a':'#ffd23a',lb.heavy?20:18);
     return;
   }
   if(lb.heavy){  // heavy block: big heal + double gold XP orbs
