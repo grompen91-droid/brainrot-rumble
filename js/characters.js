@@ -483,7 +483,7 @@ const CHARACTERS = [
   {
     id: 'soldier',
     name: 'Soldier',
-    desc: 'Stands still to unleash — 50% faster attack speed while still. Moves 40% faster but cannot shoot while moving.',
+    desc: 'Fast, solid bullets, can\'t aim while moving.',
     rarity: 'world',
     worldUnlock: null,
     chalWorldUnlock: 1,   // unlocked by beating Challenger World 1

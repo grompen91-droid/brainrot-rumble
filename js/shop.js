@@ -366,24 +366,23 @@ function afterEquipChange(){ if(typeof sfx!=='undefined') sfx.pick(); refreshMen
 function renderCharacterTab() {
   const list=$('charlist'); if(!list) return;
   if(typeof CHARACTERS==='undefined') return;
-  const worldUnlocked=+(localStorage.getItem('br_unlocked')||0);
   const rarRank={common:0,uncommon:1,rare:2,epic:3,legendary:4,mythic:5,world:-1};
   // Sort into 3 groups
   const owned=[], worldLocked=[], shopLocked=[];
   for(const char of CHARACTERS){
     const isWorld=char.rarity==='world';
-    const unlocked=isWorld?(char.worldUnlock<=worldUnlocked):isCharOwned(char.id);
+    const unlocked=isWorld?(typeof charIsUnlocked==='function'?charIsUnlocked(char.id):false):isCharOwned(char.id);
     if(unlocked) owned.push(char);
     else if(isWorld) worldLocked.push(char);
     else shopLocked.push(char);
   }
   owned.sort((a,b)=>{
     const aw=a.rarity==='world', bw=b.rarity==='world';
-    if(aw&&bw) return (a.worldUnlock||0)-(b.worldUnlock||0);
+    if(aw&&bw) return ((a.worldUnlock??a.chalWorldUnlock??0))-(b.worldUnlock??b.chalWorldUnlock??0);
     if(aw) return -1; if(bw) return 1;
     return (rarRank[b.rarity]||0)-(rarRank[a.rarity]||0);
   });
-  worldLocked.sort((a,b)=>(a.worldUnlock||0)-(b.worldUnlock||0));
+  worldLocked.sort((a,b)=>((a.worldUnlock??a.chalWorldUnlock??0))-(b.worldUnlock??b.chalWorldUnlock??0));
   shopLocked.sort((a,b)=>(rarRank[b.rarity]||0)-(rarRank[a.rarity]||0));
 
   function buildCard(char, locked){
@@ -394,7 +393,8 @@ function renderCharacterTab() {
     const portHtml='<div class="charport"><canvas id="'+thumbId+'" width="80" height="80"></canvas></div>';
     let selBtn='';
     if(locked&&isWorld){
-      selBtn='<button class="charselbtn locked" disabled>World '+(char.worldUnlock+1)+' unlock</button>';
+      const lockLbl=char.chalWorldUnlock!=null?'Challenger World '+char.chalWorldUnlock:'World '+(char.worldUnlock+1);
+      selBtn='<button class="charselbtn locked" disabled>'+lockLbl+' unlock</button>';
     } else if(locked){
       selBtn='<button class="charselbtn locked" disabled>Get in Shop</button>';
     } else if(selected){
@@ -402,7 +402,8 @@ function renderCharacterTab() {
     } else {
       selBtn='<button class="charselbtn" data-selchar="'+char.id+'">SELECT</button>';
     }
-    const lockBadge=locked&&isWorld?'<span class="charlockbadge">Beat World '+(char.worldUnlock+1)+'</span>':'';
+    const lockLabel=char.chalWorldUnlock!=null?'Beat Challenger World '+char.chalWorldUnlock:'Beat World '+(char.worldUnlock+1);
+    const lockBadge=locked&&isWorld?'<span class="charlockbadge">'+lockLabel+'</span>':'';
     let html='<div class="charcard '+rarClass+(selected?' selected':'')+(locked?' locked':'')+'" id="charcard_'+char.id+'">';
     html+=portHtml;
     html+='<div class="charinfo"><div class="charname">'+char.name+'</div>';
