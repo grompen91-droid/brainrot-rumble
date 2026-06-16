@@ -91,8 +91,10 @@ function popLucky(lb){
       tier=1; n=4+Math.floor(Math.random()*5);
     } else if(w<=9){  // waves 6-9: large orbs, 3-4
       tier=3; n=Math.random()<0.5?3:4;
-    } else {          // waves 10+: gold orbs, 1-5 weighted low
+    } else if(w<=14){ // waves 10-14: gold orbs, 1-5 weighted low
       tier=4; const _r=Math.random(); n=_r<0.40?1:_r<0.70?2:_r<0.88?3:_r<0.96?4:5;
+    } else {          // waves 15+: gold orbs, 3-8
+      tier=4; n=3+Math.floor(Math.random()*6);
     }
     for(let g=0;g<n;g++){ const a=rand(0,TAU),s=rand(100,260); gems.push({x:lb.x,y:lb.y,tier,v:ORB[tier].v,t:rand(0,6),vx:Math.cos(a)*s,vy:Math.sin(a)*s}); }
     floatText(lb.x,lb.y-lb.r-10,'+'+n+' XP!','#ffd23a',18);
@@ -130,7 +132,7 @@ const MAX_SHOOTERS = 14;                    // foes with any `shoot` attack
 const MAX_HAZARD   = 4;                     // "earthquake" types: ground AoE / geyser / debris
 const MAX_BURST    = 4;                     // burst shooters: ring volleys or 3+ aimed shots
 const SPECIAL_HP_BUFF = 1.6, SPECIAL_DMG_BUFF = 1.3;   // hazard/burst foes are rarer, so tankier & hit harder
-const MAXPARTS = 440, MAXEB = 520;   // hard caps on particles / enemy bullets (bound worst-case render + GC)
+const MAXPARTS = 280, MAXEB = 350;   // hard caps on particles / enemy bullets (bound worst-case render + GC)
 function foeIsShooter(d){ return !!d.shoot; }
 function foeIsHazard(d){ return !!d.aoe || (d.cast && (d.cast.kind==='geyser'||d.cast.kind==='debris')); }
 function foeIsBurst(d){ return !!d.shoot && (d.shoot.type==='ring' || (d.shoot.n||1)>=3); }
@@ -1838,7 +1840,11 @@ function update(dt){
   if(parts.length>MAXPARTS) parts.splice(0, parts.length-MAXPARTS);   // cap particle count (drop oldest)
   for(let i=parts.length-1;i>=0;i--){
     const p=parts[i];
-    if(p.ring){ p.r+=(p.gr||600)*dt; p.life-=dt; if(p.life<=0) parts.splice(i,1); continue; }
+    if(p.ring){
+      p.r+=(p.gr||600)*dt; p.life-=dt;
+      if(p.life<=0 || p.r>1400) { parts.splice(i,1); continue; }  // cull huge off-screen rings
+      continue;
+    }
     p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.9; p.vy*=0.9; p.life-=dt;
     if(p.life<=0) parts.splice(i,1);
   }
@@ -3057,13 +3063,19 @@ function render(){
   }
 
   // --- enemy bullets: thick dark rim + dark core = HOSTILE ---
+  // glow pass (one globalAlpha change for all bullets)
+  cx.globalAlpha=0.28;
+  for(const b of ebullets){
+    if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
+    cx.fillStyle=b.color||'#e54d4d'; cx.beginPath(); cx.arc(b.x,b.y,b.r*1.8,0,TAU); cx.fill();
+  }
+  // core + rim + highlight pass
+  cx.globalAlpha=1; cx.lineWidth=3.2; cx.strokeStyle=OUT;
   for(const b of ebullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     const bc=b.color||'#e54d4d';
-    cx.globalAlpha=0.3; cx.fillStyle=bc; cx.beginPath(); cx.arc(b.x,b.y,b.r*1.8,0,TAU); cx.fill(); cx.globalAlpha=1; // colored glow = shooter's tint
-    cx.fillStyle=bc; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
-    cx.lineWidth=3.2; cx.strokeStyle=OUT; cx.stroke();                                                            // dark rim = hostile
-    cx.fillStyle='rgba(255,255,255,0.55)'; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.34,0,TAU); cx.fill(); // glossy highlight
+    cx.fillStyle=bc; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill(); cx.stroke();
+    cx.fillStyle='rgba(255,255,255,0.55)'; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.34,0,TAU); cx.fill();
   }
 
   // --- active pet (trails directly behind player) ---
@@ -3120,9 +3132,10 @@ function render(){
 
   // --- particles ---
   for(const p of parts){
+    if(p.x<vx0-p.r-4||p.x>vx1+p.r+4||p.y<vy0-p.r-4||p.y>vy1+p.r+4) continue;
     const a = Math.max(0, p.life/p.max);
     if(p.ring){ cx.globalAlpha=a*0.6; cx.strokeStyle=p.color; cx.lineWidth=(p.lw||5)*a+1; cx.beginPath(); cx.arc(p.x,p.y,p.r,0,TAU); cx.stroke(); continue; }
-    cx.globalAlpha = a; cx.fillStyle = p.color;            // round sparks that shrink as they fade
+    cx.globalAlpha = a; cx.fillStyle = p.color;
     cx.beginPath(); cx.arc(p.x, p.y, p.r*(0.45+0.55*a), 0, TAU); cx.fill();
   }
   cx.globalAlpha=1;

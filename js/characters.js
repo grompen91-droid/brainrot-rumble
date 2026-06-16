@@ -331,17 +331,7 @@ const CHARACTERS = [
     register() {
       P.fortunatoLuckyCap = 5 + Math.floor(Math.random()*4); // 5-8, fixed for the run
       onHook('getLuckyCap', () => P.fortunatoLuckyCap);
-      onHook('onLuckySpawn', (lb) => { if(Math.random()<0.25) lb.heavy=true; }); // 25% heavy chance (was 10%)
-      // respawn blocks mid-wave every 5s if below cap
-      let respawnCd = 0;
-      onHook('petTick', (dt) => {
-        if(typeof betweenWaves==='undefined'||betweenWaves||boss) return;
-        respawnCd -= dt;
-        if(respawnCd <= 0 && typeof luckies!=='undefined' && luckies.length < P.fortunatoLuckyCap){
-          respawnCd = 5;
-          if(typeof spawnLuckyBatch==='function') spawnLuckyBatch(P.fortunatoLuckyCap);
-        }
-      });
+      onHook('onLuckySpawn', (lb) => { if(Math.random()<0.25) lb.heavy=true; }); // 25% heavy chance
       P.luckyBullets = true;
       P.noCrit = true;
       P.luckyXpOnly = true;
