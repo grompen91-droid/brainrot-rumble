@@ -298,7 +298,7 @@ const CHARACTERS = [
     worldUnlock: 3,
     baseStats: { maxHp:70, speed:230, fireRate:0.46, dmg:7 },
     register() {
-      onHook('getLuckyCap', () => 4);
+      onHook('getLuckyCap', () => 4+Math.floor(Math.random()*3)); // 4-6
       onHook('onLuckySpawn', (lb) => { if(Math.random()<0.10) lb.heavy=true; });
       P.luckyBullets = true;
       P.noCrit = true;
