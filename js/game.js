@@ -14,6 +14,7 @@ let gameMode = 'story';     // 'story' | 'challenger'
 let chalElapsed = 0;        // challenger timer — pauses during boss fights
 let chalBossIdx = 0;        // index of next boss milestone (0-3 → 5/10/15/20 min)
 let chalBossActive = false; // true while a challenger boss is alive
+let chalLuckyT = 0;         // countdown to next lucky block batch in challenger
 const CHAL_BOSS_TIMES = [300, 600, 900, 1200];  // seconds: 5/10/15/20 min
 // Challenger needs story world 3 cleared; its own progression is independent after that
 const _storyP = +(localStorage.getItem('br_unlocked')||0);
@@ -501,7 +502,10 @@ function toMenuFromClear(){
   $('world-cleared').classList.remove('hidden');
 }
 // ---- world-select carousel (menu) ----
-function worldLabel(i){ return 'WORLD '+(i+1)+' · '+(i<=unlockedMax ? WORLDS[i].name : '??? LOCKED'); }
+function worldLabel(i){
+  if(gameMode==='challenger') return 'CHALLENGER · WORLD '+(i+1);
+  return 'WORLD '+(i+1)+' · '+(i<=unlockedMax ? WORLDS[i].name : '??? LOCKED');
+}
 // per-world preview emblem shown on the Battle stage: world ground tones + its end-boss silhouette
 const _emblemURL = {};
 function worldEmblemURL(i){
@@ -846,7 +850,7 @@ function _doStartGame(wi){
   wave=1; kills=0; elapsed=0; boss=null; waveGapT=0; arena=null; bossPending=0;
   luckyTimer=rand(18,30);
   worldCoins=0;
-  chalElapsed=0; chalBossIdx=0; chalBossActive=false;
+  chalElapsed=0; chalBossIdx=0; chalBossActive=false; chalLuckyT=5;
   { const ci=$('coincount'); if(ci){ const img=ci.querySelector('img'); if(img && !img.getAttribute('src')) img.src=SP['coin'].toDataURL(); } }
   refreshHUD();   // reset level badge / kills / timer / coins so nothing shows last run's value
   state=ST.PLAY;
@@ -932,8 +936,8 @@ function ringPos(){ // spawn point on a ring around player, clamped to world
 
 function spawnBoss(){
   const def = curBosses[(Math.floor(wave/5)-1) % curBosses.length];
-  const chalMul = gameMode==='challenger' ? 2.2 : 1;
-  const mult = (1 + (wave-5)*0.12) * (curWorld().hpMul||1) * (1 + worldBand()*0.42) * chalMul;   // softened wave growth; world band carries the macro ramp
+  const chalMul = gameMode==='challenger' ? 3.5 : 1;
+  const mult = (1 + (wave-5)*0.12) * (curWorld().hpMul||1) * (1 + worldBand()*0.42) * chalMul;
   const p = arena ? { x:arena.x+arena.w/2, y:arena.y+arena.h*0.28 } : ringPos();
   const bar1 = def.hp*HP_MULT*mult, bar2 = (def.hp2||0)*HP_MULT*mult;
   const baseTotal = bar1+bar2;
@@ -968,11 +972,16 @@ function spawnBoss(){
   }
   bossLuckyT = 20;                              // first periodic lucky batch ~20s into the fight
   if(isFinal) spawnBossLucky(1);               // final bosses: a lucky block at the start of phase 1
-  // Challenger: much more aggressive attack timings
+  // Challenger: much more aggressive — faster attacks, higher speed, hits harder
   if(gameMode==='challenger'){
-    boss.gT  = (boss.gT  || 1.5) * 0.45;
-    boss.gT2 = (boss.gT2 || 2.5) * 0.45;
-    if(boss.mate){ boss.mate.gT=(boss.mate.gT||1.5)*0.45; boss.mate.gT2=(boss.mate.gT2||2.5)*0.45; }
+    boss.gT  = (boss.gT  || 1.5) * 0.32;
+    boss.gT2 = (boss.gT2 || 2.5) * 0.32;
+    boss.sp  = (boss.sp  || 46)  * 1.5;
+    boss.dmgBuff = 1.6;   // 60% more contact damage
+    if(boss.mate){
+      boss.mate.gT=(boss.mate.gT||1.5)*0.32; boss.mate.gT2=(boss.mate.gT2||2.5)*0.32;
+      boss.mate.sp=(boss.mate.sp||46)*1.5; boss.mate.dmgBuff=1.6;
+    }
   }
   sfx.boss();
   playMusic('boss'+(((Math.floor(wave/5)-1)%3+3)%3));   // a different loop per boss
@@ -988,13 +997,14 @@ function spawnBoss(){
 
 // returns false when the global cap is hit (so the caller keeps the wave's spawn budget for later)
 function spawnEnemy(){
-  if(enemies.length >= MAX_ENEMIES) return false;     // global hard cap: defer this spawn
+  const eCap = gameMode==='challenger' ? (IS_TOUCH ? 90 : 150) : MAX_ENEMIES;
+  if(enemies.length >= eCap) return false;     // global hard cap; challenger allows many more
   const maxIdx = Math.min(curFoes.length-1, Math.floor(wave/2));
   // count live specials so we can keep them few (earthquake + burst shooters especially)
   let nShoot=0, nHaz=0, nBurst=0;
   for(const o of enemies){ if(o.isBoss) continue; if(o._shooter)nShoot++; if(o._hazard)nHaz++; if(o._burst)nBurst++; }
-  // 60% of spawns are the world's basic chasers (tier-I: low HP, melee, just follow you) so the
-  // screen stays a thick swarm of weak enemies; the rest roll across everything unlocked so far.
+  // hazard/burst/shooter caps stay the same in challenger so they don't overwhelm
+  // 60% of spawns are the world's basic chasers (tier-I: low HP, melee, just follow you)
   const fodderMax = Math.min(maxIdx, 4);
   let def=null;
   for(let tries=0; tries<6; tries++){
@@ -1673,6 +1683,14 @@ function update(dt){
   }
 
   // --- enemies ---
+  // Challenger: cull enemies that wandered too far — they respawn around the player via normal spawn budget
+  if(gameMode==='challenger' && !chalBossActive){
+    const CULL_DSQ = 1800*1800;
+    for(let i=enemies.length-1;i>=0;i--){
+      const e=enemies[i];
+      if(e && !e.isBoss && dist2(e.x,e.y,P.x,P.y)>CULL_DSQ) enemies.splice(i,1);
+    }
+  }
   for(let i=enemies.length-1;i>=0;i--){
     const e=enemies[i];
     if(!e) continue;   // worldCleared() can shrink the array mid-loop (boss dies while adds are alive)
@@ -1898,12 +1916,35 @@ function update(dt){
     if(dist2(b.x,b.y,P.x,P.y) < (b.r+P.r-3)*(b.r+P.r-3)){ ebullets.splice(i,1); hurtPlayer(8); }
   }
 
-  // --- lucky blocks: overworld blocks spawn only at wave start (startWave); during fights bosses drop them ---
-  if(boss && boss.finalPhase && state===ST.PLAY){
-    bossLuckyT -= dt;                                  // FINAL bosses: 2 blocks every 20s (25 HP each) for sustain
+  // --- lucky blocks ---
+  if(gameMode==='challenger' && !chalBossActive && state===ST.PLAY){
+    // Challenger: periodic lucky block spawns around the player; Fortunato gets double cap
+    chalLuckyT -= dt;
+    const chalLuckyCap = P.luckyXpOnly ? 6 : 3;
+    if(chalLuckyT<=0){
+      chalLuckyT = P.luckyXpOnly ? 7 : 12;   // Fortunato: every 7s; others every 12s
+      if(luckies.length < chalLuckyCap){
+        const n = chalLuckyCap - luckies.length;
+        for(let k=0;k<n;k++){
+          const a=rand(0,TAU), d=rand(320,650);
+          const x=P.x+Math.cos(a)*d, y=P.y+Math.sin(a)*d;
+          const hp=5*HP_MULT*(1+(wave-1)*0.10);
+          const lb={x,y,r:26,hp,maxHp:hp,t:rand(0,TAU),hitT:0,sq:0};
+          if(typeof fireHook==='function') fireHook('onLuckySpawn', lb);
+          if(!lb.heavy && Math.random()<0.02) lb.heavy=true;
+          luckies.push(lb);
+        }
+      }
+    }
+    // Despawn lucky blocks too far away; they'll respawn near player next tick
+    const LUCKY_CULL = 1400*1400;
+    for(let i=luckies.length-1;i>=0;i--){
+      if(dist2(luckies[i].x,luckies[i].y,P.x,P.y)>LUCKY_CULL) luckies.splice(i,1);
+    }
+  } else if(boss && boss.finalPhase && state===ST.PLAY){
+    bossLuckyT -= dt;
     if(bossLuckyT<=0){ bossLuckyT = 20; spawnBossLucky(2); }
   } else if(boss && state===ST.PLAY){
-    // normal (non-final) boss: drop 2 emergency blocks (15 HP each) when low, but only if none are already out
     if(P.hp/P.maxHp < 0.25 && luckies.length===0) spawnBossLucky(2, 15);
   }
   for(let i=luckies.length-1;i>=0;i--){
@@ -1929,7 +1970,7 @@ function update(dt){
     if(d < (P.r+12)*(P.r+12)){
       gems.splice(i,1);
       if(g.heart){ const h=g.heal||(g.big?50:25); P.hp=Math.min(P.maxHp,P.hp+h); floatText(P.x,P.y-24,'+'+h,'#e8556a',g.big?20:16); burst(P.x,P.y,'#ff97a6',g.big?14:8,140); sfx.coin(); }
-      else if(g.coin){ const v=Math.round(5*(P.goldMul||1)*coinMult()*worldCoinMul()*(gameMode==='challenger'?1.8:1)); gold+=v; worldCoins+=v; saveGold(); if(window.markDirty) window.markDirty(); setCoinHUD(); floatText(g.x,g.y,'+'+v,'#f5c542',13); sfx.coin(); }
+      else if(g.coin){ const v=Math.round(5*(P.goldMul||1)*coinMult()*worldCoinMul()*(gameMode==='challenger'?2.5:1)); gold+=v; worldCoins+=v; saveGold(); if(window.markDirty) window.markDirty(); setCoinHUD(); floatText(g.x,g.y,'+'+v,'#f5c542',13); sfx.coin(); }
       else if(g.magnet){ for(const o of gems) o.vac=true; floatText(P.x,P.y-24,'MAGNET','#9fe0ff',16); burst(P.x,P.y,'#9fe0ff',12,160); sfx.level(); }   // pull in every pickup on the map
       else { gainXp(g.v); sfx.gem(2); }
     }
@@ -3326,7 +3367,7 @@ function render(){
   }
 
   // minimap (screen space)
-  if(state!==ST.MENU && !IS_TOUCH) drawMinimap();   // minimap is PC-only
+  if(state!==ST.MENU && !IS_TOUCH && gameMode!=='challenger') drawMinimap();   // minimap is PC-only; hidden in challenger (infinite map)
 
   // hurt vignette
   if(hitFlash>0){ cx.fillStyle=`rgba(220,40,40,${hitFlash*0.22})`; cx.fillRect(0,0,W,H); }
