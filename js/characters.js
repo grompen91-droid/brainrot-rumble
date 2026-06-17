@@ -104,7 +104,7 @@ function _drawZioSchermo(ctx, size, t) {
   // Dark visor
   ctx.beginPath(); ctx.roundRect(-size*0.14,-size*0.27,size*0.28,size*0.09,size*0.03);
   ctx.fillStyle='#1a2430'; ctx.fill(); ctx.strokeStyle='#2a1c10'; ctx.lineWidth=lw; ctx.stroke();
-  ctx.fillStyle='rgba(80,180,255,0.25)'; ctx.beginPath(); ctx.roundRect(-size*0.14,-size*0.27,size*0.28,size*0.09,size*0.03); ctx.fill();
+  ctx.fillStyle='rgba(80,180,255,'+(0.18+0.12*Math.sin(t*3))+')'; ctx.beginPath(); ctx.roundRect(-size*0.14,-size*0.27,size*0.28,size*0.09,size*0.03); ctx.fill();
 }
 
 function _drawSoldier(ctx, size, t) {
@@ -130,6 +130,9 @@ function _drawSoldier(ctx, size, t) {
   ctx.strokeStyle='#2a3618'; ctx.lineWidth=Math.max(1.5,size*0.03);
   ctx.beginPath(); ctx.moveTo(-size*0.16,-size*0.22); ctx.lineTo(-size*0.16,-size*0.11); ctx.stroke();
   ctx.beginPath(); ctx.moveTo( size*0.16,-size*0.22); ctx.lineTo( size*0.16,-size*0.11); ctx.stroke();
+  // Idle helmet sheen
+  ctx.fillStyle='rgba(255,255,255,'+(0.10+0.08*Math.sin(t*2.4))+')';
+  ctx.beginPath(); ctx.ellipse(-size*0.05,-size*0.30,size*0.05,size*0.025,0,0,Math.PI*2); ctx.fill();
 }
 
 function _drawIlSaggio(ctx, size, t) {
@@ -146,6 +149,9 @@ function _drawIlSaggio(ctx, size, t) {
   _fillR(ctx,size,'#e0b03a',-size*0.16,-size*0.02,size*0.32,size*0.06,size*0.02);
   // Held book
   _fillR(ctx,size,'#a02828',size*0.14,size*0.04,size*0.13,size*0.10,size*0.015);
+  // Idle page-glow sparkle above the book
+  ctx.fillStyle='rgba(224,176,58,'+(0.4+0.3*Math.sin(t*2.6))+')';
+  ctx.beginPath(); ctx.arc(size*0.18,size*0.02+Math.sin(t*2.6)*size*0.03,size*0.025,0,Math.PI*2); ctx.fill();
 }
 
 function _drawLaStrega(ctx, size, t) {
@@ -154,11 +160,13 @@ function _drawLaStrega(ctx, size, t) {
   // Cape wings drawn first (behind body)
   const capeCol='#1a0830';
   for(const side of [-1,1]){
+    ctx.save(); ctx.rotate(Math.sin(t*1.8+side)*0.05);
     ctx.beginPath();
     ctx.moveTo(side*size*0.16,size*0.10);
     ctx.bezierCurveTo(side*size*0.48,-size*0.04,side*size*0.52,-size*0.17,side*size*0.24,-size*0.27);
     ctx.bezierCurveTo(side*size*0.15,-size*0.22,side*size*0.08,-size*0.08,0,-size*0.04);
     ctx.closePath(); ctx.fillStyle=capeCol; ctx.fill(); ctx.strokeStyle='#2a1c10'; ctx.lineWidth=lw; ctx.stroke();
+    ctx.restore();
   }
   // Humanoid base: dark purple robe-legs, purple body, purple arms, pale purple skin
   _humanBase(ctx, size, '#2a1040', '#7030a0', '#a060c8', '#c87ace');
@@ -234,8 +242,10 @@ function _drawIlCampione(ctx, size, t) {
   ctx.beginPath(); ctx.arc( size*0.18,-size*0.24,size*0.22,Math.PI+Math.PI*0.15,Math.PI+Math.PI*0.85,false); ctx.stroke();
   // Humanoid base: gold/dark pants, gold outfit, golden arms, golden skin
   _humanBase(ctx, size, '#6a4800', '#d4a820', '#e8c060', '#f5d060');
-  // Medal on chest
+  // Medal on chest (idle glow pulse)
+  ctx.save(); ctx.shadowColor='#ffe27a'; ctx.shadowBlur=size*(0.06+0.04*Math.sin(t*3));
   _fillE(ctx,size,'#e0a92e', 0,size*0.08,size*0.06,size*0.06);
+  ctx.restore();
   ctx.fillStyle='#fff'; ctx.font='bold '+Math.round(size*0.08)+'px sans-serif';
   ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('★',0,size*0.08);
   _eyes(ctx, size);

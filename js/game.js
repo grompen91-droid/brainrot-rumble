@@ -912,7 +912,7 @@ for(const u of UPGRADES){ const ic='ab_'+u.id; if(SP[ic]){ u.icon=ic; if(u.evo) 
 // Synergy cards (frostfire/eventhz/...) keep their req-gating and stay available from W1.
 const CARD_MINWORLD = {
   dmg:0, rate:0, speed:0, hp:0, magnet:0, armor:0,
-  multi:1, range:1, orbit:0, crit:0, seeker:0, laststand:0, turret:1,   // World 1 now offers far more variety
+  multi:1, range:1, orbit:0, crit:0, seeker:0, laststand:0, turret:0,   // World 1 now offers far more variety
   heavy:2, regen:2, gold:2, dashcd:2,
   pierce:3, slow:3, critdmg:3, steady:3,
   vamp:4,

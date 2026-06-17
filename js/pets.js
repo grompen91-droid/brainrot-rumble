@@ -14,10 +14,11 @@ function _drawGattino(ctx, size, t) {
   ctx.strokeStyle='#2a1c10';
   ctx.lineWidth=Math.max(1.5,size*0.035);
   ctx.stroke();
-  // Tail
+  // Tail (gentle sway)
+  const tsw=Math.sin(t*2.2)*size*0.05;
   ctx.beginPath();
   ctx.moveTo(size*0.22, size*0.22);
-  ctx.bezierCurveTo(size*0.42,size*0.10, size*0.46,-size*0.08, size*0.32,-size*0.12);
+  ctx.bezierCurveTo(size*0.42+tsw,size*0.10, size*0.46+tsw,-size*0.08, size*0.32+tsw*0.6,-size*0.12);
   ctx.strokeStyle='#e88030';
   ctx.lineWidth=Math.max(3,size*0.07);
   ctx.stroke();
@@ -104,15 +105,17 @@ function _drawUccellino(ctx, size, t) {
   ctx.beginPath();
   ctx.arc(size*0.07,-size*0.19,size*0.032,0,Math.PI*2);
   ctx.fill();
-  // Wing arc (left)
+  // Wing arc (left, flapping)
+  ctx.save(); ctx.translate(-size*0.10,size*0.02); ctx.rotate(Math.sin(t*6)*0.2);
   ctx.beginPath();
-  ctx.moveTo(-size*0.10, size*0.02);
-  ctx.quadraticCurveTo(-size*0.34,-size*0.06,-size*0.18,-size*0.18);
+  ctx.moveTo(0,0);
+  ctx.quadraticCurveTo(-size*0.24,-size*0.08,-size*0.08,-size*0.20);
   ctx.fillStyle='#e8c020';
   ctx.fill();
   ctx.strokeStyle='#2a1c10';
   ctx.lineWidth=Math.max(1.5,size*0.03);
   ctx.stroke();
+  ctx.restore();
 }
 
 function _drawOrbino(ctx, size, t) {
@@ -186,6 +189,9 @@ function _drawScudetto(ctx, size, t) {
   ctx.strokeStyle='#2a5820';
   ctx.lineWidth=Math.max(1,size*0.02);
   ctx.stroke();
+  // Idle shell sheen
+  ctx.fillStyle='rgba(255,255,255,'+(0.08+0.06*Math.sin(t*2))+')';
+  ctx.beginPath(); ctx.ellipse(-size*0.08,-size*0.10,size*0.10,size*0.06,0,0,Math.PI*2); ctx.fill();
 }
 
 function _drawCalamita(ctx, size, t) {
@@ -229,10 +235,13 @@ function _drawCalamita(ctx, size, t) {
   ctx.lineWidth=Math.max(1,size*0.02);
   for(let i=0;i<3;i++){
     const off=i*size*0.08+size*0.08;
+    const ph=t*1.5+i*0.7;
+    ctx.globalAlpha=0.5+0.5*Math.sin(ph);
     ctx.beginPath();
     ctx.arc(0,-sh,cr+off,0,Math.PI,false);
     ctx.stroke();
   }
+  ctx.globalAlpha=1;
 }
 
 function _drawDraghetto(ctx, size, t) {
@@ -286,6 +295,7 @@ function _drawDraghetto(ctx, size, t) {
   const fx=0, fy=size*0.32;
   ctx.save();
   ctx.translate(fx,fy);
+  ctx.scale(1+Math.sin(t*9)*0.05, 1+Math.sin(t*9)*0.15);
   ctx.beginPath();
   ctx.moveTo(0,0);
   ctx.bezierCurveTo(-size*0.08,-size*0.12, -size*0.04,-size*0.20, 0,-size*0.24);
@@ -313,7 +323,7 @@ function _drawStellina(ctx, size, t) {
   // Glow
   ctx.save();
   ctx.shadowColor='#ffd24a';
-  ctx.shadowBlur=size*0.20;
+  ctx.shadowBlur=size*(0.16+0.06*Math.sin(t*3));
   ctx.beginPath();
   for(let i=0;i<points*2;i++){
     const a=i*Math.PI/points - Math.PI/2;
@@ -368,7 +378,9 @@ function _drawAnimaGemella(ctx, size, t) {
   ctx.strokeStyle='#2a1c10';
   ctx.lineWidth=Math.max(1.5,size*0.03);
   ctx.stroke();
-  // Twin (offset right)
+  // Twin (offset right, gentle independent float)
+  ctx.save();
+  ctx.translate(0,Math.sin(t*1.7)*size*0.025);
   ctx.globalAlpha=0.55;
   ctx.beginPath();
   ctx.arc(size*0.10, -size*0.08, size*0.18, Math.PI, 0, false);
@@ -381,6 +393,7 @@ function _drawAnimaGemella(ctx, size, t) {
   ctx.lineWidth=Math.max(1,size*0.025);
   ctx.stroke();
   ctx.globalAlpha=1.0;
+  ctx.restore();
   // Hollow eyes on main ghost
   ctx.strokeStyle='#2a1c10';
   ctx.lineWidth=Math.max(1,size*0.025);
