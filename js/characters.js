@@ -86,29 +86,6 @@ function _drawFortunato(ctx, size, t) {
   ctx.restore();
 }
 
-function _drawSorellaVeloce(ctx, size, t) {
-  t = t||0;
-  const lw=Math.max(1.5,size*0.038);
-  // Ponytail behind head (draw first so head covers the base)
-  ctx.beginPath(); ctx.moveTo(-size*0.06,-size*0.22);
-  ctx.bezierCurveTo(-size*0.22,-size*0.28,-size*0.28,-size*0.10,-size*0.20,-size*0.02);
-  ctx.strokeStyle='#7a4a20'; ctx.lineWidth=Math.max(3,size*0.055); ctx.lineCap='round'; ctx.stroke(); ctx.lineCap='butt';
-  // Humanoid base: blue jeans, cyan racing jacket, cyan arms, light skin
-  _humanBase(ctx, size, '#1e3f7a', '#2a8adf', '#5ab8e8', '#f0d0b0');
-  // White speed stripe on jacket
-  ctx.beginPath(); ctx.moveTo(-size*0.15,size*0.04); ctx.lineTo(size*0.15,size*0.00);
-  ctx.strokeStyle='rgba(255,255,255,0.65)'; ctx.lineWidth=Math.max(2,size*0.03); ctx.stroke();
-  _eyes(ctx, size);
-  // Speed lines trailing left
-  ctx.lineCap='round';
-  for(let i=0;i<3;i++){
-    const y=-size*0.04+i*size*0.12; const len=(i===1?0.26:0.17)*size;
-    ctx.beginPath(); ctx.moveTo(-size*0.24,y); ctx.lineTo(-size*0.24-len,y);
-    ctx.strokeStyle='#7ae8ff'; ctx.lineWidth=Math.max(1.5,size*0.025); ctx.globalAlpha=0.7-i*0.15; ctx.stroke(); ctx.globalAlpha=1;
-  }
-  ctx.lineCap='butt';
-}
-
 function _drawZioSchermo(ctx, size, t) {
   t = t||0;
   const lw=Math.max(1.5,size*0.038);
@@ -334,18 +311,6 @@ const CHARACTERS = [
       P.luckyBlockDmgMul = 2.5;
     },
     draw(ctx, size, t) { _drawFortunato(ctx, size, t); }
-  },
-  {
-    id: 'sorella_veloce',
-    name: 'Sorella Veloce',
-    desc: '+35% speed. Dash has 2 charges. Kill within 0.5s of dash = +15% dmg for 3s (stacks x3).',
-    rarity: 'rare',
-    worldUnlock: null,
-    baseStats: { speed:270 },
-    register() {
-      onHook('onDash', () => { if(typeof P!=='undefined') P.dashCharges=2; });
-    },
-    draw(ctx, size, t) { _drawSorellaVeloce(ctx, size, t); }
   },
   {
     id: 'zio_schermo',
