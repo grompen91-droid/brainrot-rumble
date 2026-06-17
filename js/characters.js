@@ -296,7 +296,7 @@ const CHARACTERS = [
   {
     id: 'fortunato',
     name: 'Fortunato',
-    desc: 'More lucky blocks, more RNG. Can one-tap any lucky block.',
+    desc: 'More lucky blocks, more RNG. Can one-tap any lucky block. Starts with 2 projectiles, can\'t take Splinter Shot.',
     rarity: 'epic',
     worldUnlock: null,
     gemPrice: 25,     // Character Shop only — no progression unlock
@@ -309,6 +309,8 @@ const CHARACTERS = [
       P.noCrit = true;
       P.luckyXpOnly = true;
       P.luckyBlockDmgMul = 2.5;
+      P.shots = 2;                              // starts with 2 projectiles
+      P.bannedCards = (P.bannedCards||[]).concat(['multi']); // can't stack more via Splinter Shot
     },
     draw(ctx, size, t) { _drawFortunato(ctx, size, t); }
   },
