@@ -717,7 +717,7 @@ const UPGRADES = [
   { id:'pierce', name:'Piercing Rounds', icon:'crocodilo', rarity:'rare',
     steps:[{desc:'pierce +1 enemy.',f:()=>P.pierce+=1},{desc:'pierce +1 enemy.',f:()=>P.pierce+=1},{desc:'pierce +1 enemy.',f:()=>P.pierce+=1},{desc:'pierce +1 enemy.',f:()=>P.pierce+=1}],
     evo:{name:'Hyper-Velocity Core', icon:'crocodilo', desc:'EVOLVE — infinite pierce, faster & larger cyan shots.', f:()=>{P.pierce=999;P.railgun=true;}} },
-  { id:'turret', name:'Walking Turret', icon:'gembig', rarity:'rare',
+  { id:'turret', name:'Walking Turret', icon:'gembig', rarity:'epic',
     steps:[
       {desc:'Deploy a walking turret that follows behind your pet: fires the closest enemy for 10% of your damage, at default range & fire rate.', f:()=>{ P.turretCount=Math.max(1,P.turretCount||0); P.turretDmgBase=P.dmg*0.10; }},
       {desc:'Turret fires 20% faster and hits 30% harder.', f:()=>{ P.turretFireMul=(P.turretFireMul||1)*1.2; P.turretDmgMul=(P.turretDmgMul||1)*1.3; }},
