@@ -1,7 +1,10 @@
 'use strict';
 // ============ CANVAS SETUP & SHARED HELPERS ============
 const cv = document.getElementById('game');
-const cx = cv.getContext('2d');
+// alpha:false -- the canvas is always fully repainted (void fill covers the whole viewport every
+// frame), so the browser can skip alpha-compositing this layer entirely. Costs nothing visually,
+// helps most on software-rendered canvases (common on Linux when GPU accel isn't available).
+const cx = cv.getContext('2d', { alpha:false });
 let W=0, H=0, DPR=1;
 function resize(){
   // Capped well below the real DPR: profiling showed ~85% of active CPU time inside
