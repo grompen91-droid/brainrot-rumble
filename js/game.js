@@ -1504,8 +1504,9 @@ function openLevelUp(){
     d.className = 'card r-'+tier + (m.evolve ? ' evolve' : '') + (u.req ? ' synergy' : '');
     const ic = SP[m.icon] ? SP[m.icon].toDataURL() : '';
     const owned = P.up[u.id]||0;
-    // 5-star rating row (filled = the level you currently have, before this pick)
-    const total = u.evo ? 5 : (u.cap||5);
+    // star rating row (filled = the level you currently have, before this pick) — capped to
+    // this card's actual max levels, not a flat 5, so a 3-step ability doesn't show dead slots
+    const total = u.evo ? u.steps.length+1 : (u.cap||5);
     let stars=''; for(let i=0;i<total;i++) stars += `<span class="cstar${i < owned ? ' on' : ''}">★</span>`;
     const tag = m.evolve ? 'EVO!' : (owned===0 ? 'New!' : m.label);
     d.innerHTML = `<div class="chead"><span class="cnew">${tag}</span>${m.name}</div>`+

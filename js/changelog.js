@@ -1,8 +1,9 @@
 'use strict';
 // Versioning: +0.01 per patch/small update/bugfix, +0.1 per big update/rework, +1.0 per major release.
 // Append a new entry (and bump CURRENT_VERSION) every push that changes the game.
-const CURRENT_VERSION = '1.25';
+const CURRENT_VERSION = '1.26';
 const CHANGELOG = [
+  { v: '1.26', notes: 'Fixed ability cards showing extra unreachable stars after evolving (e.g. Turret Network showed 5 star slots for a card with only 4 real levels).' },
   { v: '1.25', notes: 'Added a one-time cutscene after first clearing World 1: Tung Tung Tung Sahur rises from defeat and revives his fallen army before they vow to grow stronger.' },
   { v: '1.15', notes: 'Walking Turret redesigned: detailed tripod body with a swiveling twin-barrel head instead of a flat top-down disc. Its card description is shorter too.' },
   { v: '1.14', notes: 'Fantasma is now a Legendary character shop-only — no longer a World 9 unlock. La Strega has been removed from the game.' },
