@@ -1618,6 +1618,7 @@ function tickChainTurret(tu, dt, range, fireCd, dmg){
   if(tu.cd<=0){
     let target=null, bd=range*range;
     forEnemiesNear(tu.x,tu.y,range,(e)=>{ if(e.under) return; const d=dist2(tu.x,tu.y,e.x,e.y); if(d<=bd){ bd=d; target=e; } });
+    for(const lb of luckies){ const d=dist2(tu.x,tu.y,lb.x,lb.y); if(d<=bd){ bd=d; target=lb; } }   // turrets also shoot lucky blocks
     if(target){
       tu.face = Math.atan2(target.y-tu.y, target.x-tu.x);
       petBullets.push({x:tu.x,y:tu.y,tx:target.x,ty:target.y,target,dmg});
@@ -1770,6 +1771,13 @@ function update(dt){
             if(Math.random()<0.15) parts.push({x:e.x+rand(-8,8),y:e.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.35,max:0.35,color:'#ff8a3a',r:rand(2,4)});
           }
         });
+        for(const lb of luckies){   // flame also burns lucky blocks
+          if(dist2(tu.x,tu.y,lb.x,lb.y) < flameR*flameR){
+            tu.firing = true; tu.face = Math.atan2(lb.y-tu.y, lb.x-tu.x);
+            lb.hp -= P.dmg*(P.flameDmgFrac||0.08)*dt; lb.hitT=0.05; lb.sq=1;
+            if(Math.random()<0.15) parts.push({x:lb.x+rand(-8,8),y:lb.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.35,max:0.35,color:'#ff8a3a',r:rand(2,4)});
+          }
+        }
       }
     }
   }
@@ -2150,7 +2158,7 @@ function update(dt){
     const pb=petBullets[i];
     const dx=pb.tx-pb.x, dy=pb.ty-pb.y, dist=Math.hypot(dx,dy);
     if(dist<12){
-      if(pb.target && pb.target.hp>0 && pb.target.iv<=0){
+      if(pb.target && pb.target.hp>0 && (pb.target.iv||0)<=0){
         pb.target.hp-=pb.dmg; pb.target.hitT=Math.max(pb.target.hitT||0,0.1);
         texts.push({x:pb.target.x,y:pb.target.y-(pb.target.r||16)-4,str:String(Math.round(pb.dmg)),color:'#6be8ff',size:13,life:0.9,max:0.9,vy:-55,vx:(Math.random()-0.5)*120});
         burst(pb.x,pb.y,'#6be8ff',5,60);

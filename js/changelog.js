@@ -1,8 +1,9 @@
 'use strict';
 // Versioning: +0.01 per patch/small update/bugfix, +0.1 per big update/rework, +1.0 per major release.
 // Append a new entry (and bump CURRENT_VERSION) every push that changes the game.
-const CURRENT_VERSION = '1.39';
+const CURRENT_VERSION = '1.40';
 const CHANGELOG = [
+  { v: '1.40', notes: 'All turrets (Walking, Minigun, Flamethrower, Engineer placed) now also target and damage lucky blocks, not just enemies.' },
   { v: '1.39', notes: 'Fixed EVOLVE card screens showing one unfilled star — they now show all stars filled since picking EVOLVE maxes the card out.' },
   { v: '1.38', notes: 'Fixed Walking Turret card not adding a turret on top of Engineer\'s starting 2. Dashing as Engineer at the 3-turret cap now destroys the oldest placed turret and places a new one instead of doing nothing.' },
   { v: '1.37', notes: 'Engineer is now unlocked at World 2 (for now), instead of being a gem-shop character.' },
