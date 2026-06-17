@@ -4,6 +4,7 @@ let shake = 0, hitFlash = 0, hitstop = 0, tPrev = 0, elapsed = 0;
 
 const P = {}; // player
 let bullets=[], ebullets=[], petBullets=[], enemies=[], gems=[], parts=[], texts=[], zones=[], holes=[], luckies=[];
+let skibidiBullets=[], skibidiTimers=[];   // Skibidi Toilet card: edge-bouncing persistent bullets, own lifecycle
 let timeScale=1.0;
 let _vis=[];   // reused per-frame scratch list of visible enemies (depth sort) — avoids GC churn
 let wave=1, kills=0, spawnTimer=0, waveEnemiesLeft=0, betweenWaves=false, boss=null;
@@ -483,7 +484,7 @@ function worldCleared(boss){
   cut = { t:0, boss:boss, alpha:1, fade:0, name:curWorld().name };
   boss.cut = true; boss.deathScale = 1;
   enemies.length=0; enemies.push(boss);   // keep only the dying boss on screen
-  ebullets=[]; bullets=[]; petBullets=[]; zones=[];
+  ebullets=[]; bullets=[]; petBullets=[]; zones=[]; skibidiBullets.length=0; skibidiTimers.length=0;
   hitstop=0.25; shake=Math.max(shake,16);
   stopMusic(); sfx.win();
   bigText(isPractice ? 'TRAINING COMPLETE' : 'WORLD CLEARED', '#ffd24a');
@@ -761,6 +762,20 @@ const UPGRADES = [
   { id:'showstopper', name:'Showstopper', icon:'coin', rarity:'epic', cap:1, req:['luckyspin','crit'],
     steps:[{desc:'SYNERGY — JACKPOT hits also critically strike.',f:()=>P.showstopper=true}] },
 
+  { id:'auramonster', name:'Aura Monster', icon:'gembig', rarity:'rare', minWorld:1, cap:3,
+    steps:[
+      {desc:'gain a green damage aura around you.', f:()=>{P.auraR=70; P.auraDmg=8;}},
+      {desc:'aura grows bigger.',                   f:()=>{P.auraR+=30;}},
+      {desc:'aura grows bigger and hits harder.',   f:()=>{P.auraR+=30; P.auraDmg+=10;}},
+    ] },
+  { id:'skibidi', name:'Skibidi Toilet', icon:'gembig', rarity:'epic', minWorld:3, cap:4,
+    steps:[
+      {desc:'summon a Skibidi Toilet that bounces off the map edges 6 times before vanishing, reappearing after 10s.', f:()=>{P.skibidiCount=1; P.skibidiBounces=6;}},
+      {desc:'bounces more before vanishing.',         f:()=>{P.skibidiBounces+=4;}},
+      {desc:'+1 Skibidi Toilet.',                      f:()=>{P.skibidiCount+=1;}},
+      {desc:'+1 Skibidi Toilet — they never stop respawning.', f:()=>{P.skibidiCount+=1; P.skibidiAlways=true;}},
+    ] },
+
   // ✨ SYNERGY cards — hidden until you own the prerequisite cards (req)
   { id:'frostfire', name:'Frostfire Core', icon:'gem', rarity:'epic', cap:1, req:['slow','nova'],
     steps:[{desc:'SYNERGY — Nova does +120% to frozen foes, who shatter into shards on death.',f:()=>P.frostfire=true}] },
@@ -810,7 +825,8 @@ function nextMove(u){
     return null;
   }
   if(lvl >= (u.cap||5)) return null;
-  return { apply:u.steps[0].f, name:u.name, icon:u.icon, desc:u.steps[0].desc, label:'Lv '+(lvl+1), evolve:false, rare:u.rare };
+  const si = Math.min(lvl, u.steps.length-1);   // supports cards with several distinct non-evolving steps, not just one repeated step
+  return { apply:u.steps[si].f, name:u.name, icon:u.icon, desc:u.steps[si].desc, label:'Lv '+(lvl+1), evolve:false, rare:u.rare };
 }
 
 function resetPlayer(){
@@ -855,8 +871,11 @@ function resetPlayer(){
     fortunatoLuckyCap:5,
     trueDmg:false,
     soldierStill:false, soldierBullets:false,
-    noCards:false, whiteBullets:false, stealthAggro:false, ghostBullets:false
+    noCards:false, whiteBullets:false, stealthAggro:false, ghostBullets:false,
+    auraR:0, auraDmg:0,
+    skibidiCount:0, skibidiBounces:6, skibidiAlways:false
   });
+  skibidiBullets.length=0; skibidiTimers.length=0;
 }
 
 function startGame(idx){
@@ -953,7 +972,7 @@ function chalWorldCleared(e){
   cut={ t:0, boss:e, alpha:1, fade:0, name:curWorld().name+' CHALLENGER' };
   e.cut=true; e.deathScale=1;
   enemies.length=0; enemies.push(e);
-  ebullets=[]; bullets=[]; petBullets=[]; zones=[];
+  ebullets=[]; bullets=[]; petBullets=[]; zones=[]; skibidiBullets.length=0; skibidiTimers.length=0;
   hitstop=0.25; shake=Math.max(shake,16);
   stopMusic(); sfx.win();
   bigText('CHALLENGER CLEARED','#ff5a70');
@@ -1166,6 +1185,26 @@ function drawKnifeBullet(b){
   cx.beginPath(); cx.rect(r*0.3,-r*0.55,r*0.25,r*1.1); cx.fill(); cx.stroke();
   // hilt
   cx.fillStyle='#8a5d2c'; cx.beginPath(); cx.rect(-r*0.9,-r*0.22,r*1.0,r*0.44); cx.fill(); cx.stroke();
+  cx.restore();
+}
+
+function drawSkibidiToilet(b){
+  const s=18;
+  cx.save(); cx.translate(b.x,b.y); cx.rotate(b.spin);
+  // friendly halo — distinct icy-blue so it's clearly the player's own bouncing hazard
+  cx.globalAlpha=0.4; cx.strokeStyle='#cfe8ff'; cx.lineWidth=2.5;
+  cx.beginPath(); cx.arc(0,0,s*1.3,0,TAU); cx.stroke(); cx.globalAlpha=1;
+  // tank (back box)
+  cx.fillStyle='#e8eaf0'; cx.strokeStyle='#33272a'; cx.lineWidth=1.8;
+  cx.beginPath(); cx.roundRect(-s*0.55,-s*0.95,s*1.1,s*0.55,3); cx.fill(); cx.stroke();
+  // bowl base
+  cx.beginPath(); cx.roundRect(-s*0.75,-s*0.35,s*1.5,s*0.95,6); cx.fill(); cx.stroke();
+  // seat ring
+  cx.fillStyle='#2a2a2e';
+  cx.beginPath(); cx.ellipse(0,-s*0.05,s*0.55,s*0.32,0,0,TAU); cx.fill();
+  // water
+  cx.fillStyle='#5fc7ff';
+  cx.beginPath(); cx.ellipse(0,-s*0.05,s*0.38,s*0.2,0,0,TAU); cx.fill();
   cx.restore();
 }
 
@@ -1530,6 +1569,44 @@ function update(dt){
       if(e.iv>0 || e.lead) return;
       if(dist2(P.x,P.y,e.x,e.y) < 80*80){ e.hp -= P.burnAura*dt; e.hitT=Math.max(e.hitT,0.05);
         if(Math.random()<0.18) parts.push({x:e.x+rand(-8,8),y:e.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.4,max:0.4,color:'#ff8a3a',r:rand(2,4)}); }
+    });
+  }
+
+  // --- Aura Monster: green damage aura around the player ---
+  if(P.auraR>0){
+    forEnemiesNear(P.x,P.y,P.auraR,(e)=>{
+      if(e.iv>0 || e.lead) return;
+      if(dist2(P.x,P.y,e.x,e.y) < P.auraR*P.auraR){ e.hp -= P.auraDmg*dt; e.hitT=Math.max(e.hitT,0.05);
+        if(Math.random()<0.1) parts.push({x:e.x+rand(-8,8),y:e.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.4,max:0.4,color:'#5fe66a',r:rand(2,4)}); }
+    });
+  }
+
+  // --- Skibidi Toilet: edge-bouncing persistent bullets, own spawn/respawn cycle ---
+  if(P.skibidiCount>0){
+    while(skibidiTimers.length<P.skibidiCount) skibidiTimers.push(0);
+    for(let i=0;i<P.skibidiCount;i++){
+      if(!skibidiBullets[i] || skibidiBullets[i].dead){
+        if(skibidiTimers[i]>0){ skibidiTimers[i]-=dt; continue; }
+        const a=rand(0,TAU), spd=300;
+        skibidiBullets[i]={x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,bounces:0,spin:0,dead:false};
+      }
+    }
+  }
+  for(let i=0;i<skibidiBullets.length;i++){
+    const b=skibidiBullets[i]; if(!b||b.dead) continue;
+    b.x+=b.vx*dt; b.y+=b.vy*dt; b.spin+=dt*7;
+    let bounced=false;
+    if(b.x<WALL){ b.x=WALL; b.vx=Math.abs(b.vx); bounced=true; }
+    else if(b.x>WORLD.w-WALL){ b.x=WORLD.w-WALL; b.vx=-Math.abs(b.vx); bounced=true; }
+    if(b.y<WALL){ b.y=WALL; b.vy=Math.abs(b.vy); bounced=true; }
+    else if(b.y>WORLD.h-WALL){ b.y=WORLD.h-WALL; b.vy=-Math.abs(b.vy); bounced=true; }
+    if(bounced){
+      b.bounces++; burst(b.x,b.y,'#cfe8ff',6,140); sfx.hit();
+      if(b.bounces>=P.skibidiBounces){ b.dead=true; skibidiTimers[i]=P.skibidiAlways?0:10; continue; }
+    }
+    forEnemiesNear(b.x,b.y,24,(e)=>{
+      if(e.iv>0 || e.lead) return;
+      if(dist2(b.x,b.y,e.x,e.y) < 24*24){ e.hp -= P.dmg*1.1*dt; e.hitT=Math.max(e.hitT,0.05); }
     });
   }
 
@@ -3282,6 +3359,13 @@ function render(){
     cx.fillStyle='#6be8ff'; cx.beginPath(); cx.arc(pb.x,pb.y,4,0,TAU); cx.fill();
   }
 
+  // --- Skibidi Toilet bullets: spinning toilets bouncing off the map edges ---
+  for(const b of skibidiBullets){
+    if(!b || b.dead) continue;
+    if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
+    drawSkibidiToilet(b);
+  }
+
   // --- orbs ---
   if(P.orbs>0 && state!==ST.MENU){
     for(let i=0;i<P.orbs;i++){
@@ -3417,6 +3501,14 @@ function render(){
     if(P.burnAura>0){
       cx.globalAlpha=0.12+0.05*Math.sin(elapsed*8); cx.fillStyle='#ff7a3a';
       cx.beginPath(); cx.arc(P.x,P.y,80,0,TAU); cx.fill(); cx.globalAlpha=1;
+    }
+    // Aura Monster: clearly-green damage aura, fill + bright ring so it always reads as "yours"
+    if(P.auraR>0){
+      cx.globalAlpha=0.16+0.05*Math.sin(elapsed*6); cx.fillStyle='#39d953';
+      cx.beginPath(); cx.arc(P.x,P.y,P.auraR,0,TAU); cx.fill();
+      cx.globalAlpha=0.55; cx.strokeStyle='#2ecc40'; cx.lineWidth=2.5;
+      cx.beginPath(); cx.arc(P.x,P.y,P.auraR,0,TAU); cx.stroke();
+      cx.globalAlpha=1;
     }
     // Soldier stand-still boost indicator — pulsing red ring
     if(P.soldierBullets && P.soldierStill){
