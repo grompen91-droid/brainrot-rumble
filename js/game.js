@@ -9,6 +9,7 @@ let _vis=[];   // reused per-frame scratch list of visible enemies (depth sort) 
 let wave=1, kills=0, spawnTimer=0, waveEnemiesLeft=0, betweenWaves=false, boss=null;
 let worldCoins=0;   // coins collected during the CURRENT world run (in-game HUD display; total still banked in `gold`)
 let _lastSec=-1;    // throttles the survival-timer DOM update to once per second
+const MMH = window.MINIMAP_HELPERS;
 // ===== CHALLENGER MODE STATE =====
 let gameMode = 'story';     // 'story' | 'challenger'
 let chalElapsed = 0;        // challenger timer — pauses during boss fights
@@ -3386,7 +3387,7 @@ function render(){
   }
 
   // minimap (screen space)
-  if(state!==ST.MENU && !IS_TOUCH && gameMode!=='challenger') drawMinimap();   // minimap is PC-only; hidden in challenger (infinite map)
+  if(shouldShowMinimap()) drawMinimap();
 
   // hurt vignette
   if(hitFlash>0){ cx.fillStyle=`rgba(220,40,40,${hitFlash*0.22})`; cx.fillRect(0,0,W,H); }
@@ -3483,38 +3484,168 @@ function renderZones(){
   cx.globalAlpha=1;
 }
 
-function drawMinimap(){
-  // PC only (hidden on mobile). Frame + playfield colors follow the world theme.
-  const ms = Math.round(clamp(Math.min(W,H)*0.2, 150, 240));
-  const pad = 18;
-  const mx=pad, my=H-ms-pad;
-  cx.globalAlpha=0.9;
-  cx.fillStyle=curTheme.void||'#3a2d22'; cx.fillRect(mx-3,my-3,ms+6,ms+6);
-  cx.fillStyle=curTheme.tile1||'#6fae3d'; cx.fillRect(mx,my,ms,ms);
-  if(gameMode==='challenger'){
-    // Infinite map: show 2400-unit radius centered on player
-    const view=2400, sxk=ms/view, syk=ms/view, ox=P.x-view/2, oy=P.y-view/2;
-    cx.fillStyle='#4ab3ff';
-    for(const g of gems){ if(g.coin||g.heart||g.magnet) continue; cx.fillRect(mx+(g.x-ox)*sxk, my+(g.y-oy)*syk, 2,2); }
-    cx.fillStyle='#e54d4d';
-    for(const e of enemies){ cx.fillRect(mx+(e.x-ox)*sxk-1, my+(e.y-oy)*syk-1, e.isBoss?4:2, e.isBoss?4:2); }
-    cx.fillStyle='#ffd23a';
-    for(const lb of luckies){ cx.fillRect(mx+(lb.x-ox)*sxk-2, my+(lb.y-oy)*syk-2, 4,4); }
-    cx.fillStyle='#fff'; cx.fillRect(mx+ms/2-2, my+ms/2-2, 4,4);   // player always center
-    cx.strokeStyle='rgba(255,255,255,0.6)'; cx.lineWidth=2;
-    cx.strokeRect(mx+(camera.x-ox)*sxk, my+(camera.y-oy)*syk, (W/zoom)*sxk, (H/zoom)*syk);
-  } else {
-    const sxk=ms/WORLD.w, syk=ms/WORLD.h;
-    cx.fillStyle='#4ab3ff';
-    for(const g of gems){ if(g.coin||g.heart||g.magnet) continue; cx.fillRect(mx+g.x*sxk, my+g.y*syk, 2,2); }
-    cx.fillStyle='#e54d4d';
-    for(const e of enemies){ cx.fillRect(mx+e.x*sxk-1, my+e.y*syk-1, e.isBoss?4:2, e.isBoss?4:2); }
-    cx.fillStyle='#ffd23a';
-    for(const lb of luckies){ cx.fillRect(mx+lb.x*sxk-2, my+lb.y*syk-2, 4,4); }
-    cx.fillStyle='#fff'; cx.fillRect(mx+P.x*sxk-2, my+P.y*syk-2, 4,4);
-    cx.strokeStyle='#fff'; cx.lineWidth=2; cx.strokeRect(mx+camera.x*sxk, my+camera.y*syk, (W/zoom)*sxk, (H/zoom)*syk);
+function shouldShowMinimap(){ return state!==ST.MENU && state!==ST.OVER && !IS_TOUCH; }
+function minimapSize(){ return Math.round(clamp(Math.min(W,H)*0.2, 150, 240)); }
+function minimapGeom(){
+  const ms = minimapSize(), pad = 18;
+  return { ms, pad, mx:pad, my:H-ms-pad };
+}
+function miniDisc(x,y,r,fill,stroke,lw){
+  cx.fillStyle=fill; cx.beginPath(); cx.arc(x,y,r,0,TAU); cx.fill();
+  if(stroke){ cx.strokeStyle=stroke; cx.lineWidth=lw||2; cx.stroke(); }
+}
+function miniDiamond(x,y,r,fill,stroke,lw){
+  cx.fillStyle=fill; cx.beginPath(); cx.moveTo(x,y-r); cx.lineTo(x+r,y); cx.lineTo(x,y+r); cx.lineTo(x-r,y); cx.closePath(); cx.fill();
+  if(stroke){ cx.strokeStyle=stroke; cx.lineWidth=lw||2; cx.stroke(); }
+}
+function miniRoundRect(x,y,w,h,r,fill,stroke,lw){
+  cx.beginPath(); cx.roundRect(x,y,w,h,r);
+  if(fill){ cx.fillStyle=fill; cx.fill(); }
+  if(stroke){ cx.strokeStyle=stroke; cx.lineWidth=lw||2; cx.stroke(); }
+}
+function miniProject(view, x, y, mx, my){
+  const p=MMH.projectPoint(view,x,y);
+  p.x+=mx; p.y+=my;
+  return p;
+}
+function miniCardEnemyIcon(x,y,boss,tint){
+  const r=boss?6.4:3.6;
+  miniDisc(x,y,r,boss?'#d92b2b':'#e54d4d','#2a1c10',boss?2.3:1.4);
+  if(boss){ miniDisc(x,y,3.2,'#ffb0a8',null,0); }
+}
+function miniCardBossIcon(x,y){
+  miniDisc(x,y,7.4,'#d92b2b','#2a1c10',2.4);
+  cx.strokeStyle='#fff'; cx.lineWidth=1.5; cx.beginPath(); cx.arc(x,y,10.4,0,TAU); cx.stroke();
+  cx.fillStyle='#2a1c10';
+  cx.beginPath(); cx.moveTo(x-4,y-2); cx.lineTo(x,y-6); cx.lineTo(x+4,y-2); cx.lineTo(x+2.5,y+4); cx.lineTo(x-2.5,y+4); cx.closePath(); cx.fill();
+}
+function miniCardHeartIcon(x,y,big){
+  const s=big?4.4:3.4;
+  cx.fillStyle='#e8556a';
+  cx.beginPath();
+  cx.moveTo(x,y+s);
+  cx.bezierCurveTo(x-s*1.7,y-s*.2,x-s*.9,y-s*1.7,x,y-s*.7);
+  cx.bezierCurveTo(x+s*.9,y-s*1.7,x+s*1.7,y-s*.2,x,y+s);
+  cx.fill();
+  cx.strokeStyle='#2a1c10'; cx.lineWidth=1.1; cx.stroke();
+}
+function miniCardMagnetIcon(x,y){
+  cx.lineCap='round';
+  cx.strokeStyle='#2a1c10'; cx.lineWidth=4;
+  cx.beginPath(); cx.arc(x,y-1,4.2,Math.PI,TAU); cx.stroke();
+  cx.beginPath(); cx.moveTo(x-4.2,y-1); cx.lineTo(x-4.2,y+4.4); cx.moveTo(x+4.2,y-1); cx.lineTo(x+4.2,y+4.4); cx.stroke();
+  cx.strokeStyle='#e0392e'; cx.lineWidth=2.3;
+  cx.beginPath(); cx.arc(x,y-1,4.2,Math.PI,TAU); cx.stroke();
+  cx.beginPath(); cx.moveTo(x-4.2,y-1); cx.lineTo(x-4.2,y+4.4); cx.moveTo(x+4.2,y-1); cx.lineTo(x+4.2,y+4.4); cx.stroke();
+  cx.lineCap='butt';
+  cx.fillStyle='#d7dde6';
+  cx.fillRect(x-5.6,y+2.8,2.8,2.5);
+  cx.fillRect(x+2.8,y+2.8,2.8,2.5);
+}
+function miniCardOrbIcon(x,y,tier){
+  const col = tier>=3 ? 'rgba(255,207,58,.76)' : tier===2 ? 'rgba(70,217,138,.64)' : 'rgba(191,230,255,.56)';
+  const border = tier>=3 ? 'rgba(150,92,12,.62)' : 'rgba(42,28,16,.34)';
+  miniDiamond(x,y,tier>=3?3.1:2.6,col,border,.7);
+  if(tier>=3){ cx.fillStyle='rgba(255,255,255,.55)'; cx.fillRect(x-.8,y-1.8,1.2,1.2); }
+}
+function miniCardLuckyIcon(x,y,heavy){
+  const s=heavy?15:10, r=heavy?4:3;
+  if(heavy){
+    cx.strokeStyle='rgba(255,255,255,.65)'; cx.lineWidth=1.5; cx.setLineDash([4,4]);
+    cx.beginPath(); cx.arc(x,y,s*.86,0,TAU); cx.stroke(); cx.setLineDash([]);
+  }
+  miniRoundRect(x-s/2,y-s/2,s,s,r,heavy?'#dce0e4':'#ffd24a','#2a1c10',heavy?1.9:1.7);
+  if(heavy){ miniRoundRect(x-s/2+2,y-s/2+2,s-4,(s-4)*.42,2,'rgba(255,255,255,.55)',null,0); }
+  cx.fillStyle=heavy?'#555b62':'#2a1c10'; cx.font='900 '+(heavy?10:8)+'px sans-serif'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText('?',x,y+.2);
+}
+function drawMiniCamera(view,mx,my,clipCircle){
+  const x=mx+(camera.x-view.ox)*view.sx, y=my+(camera.y-view.oy)*view.sy;
+  const w=(W/zoom)*view.sx, h=(H/zoom)*view.sy;
+  if(clipCircle){
+    const cx0=mx+view.size/2, cy0=my+view.size/2, r=view.size/2-5;
+    const corners=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>{
+      const dx=px-cx0, dy=py-cy0, d=Math.max(1,Math.hypot(dx,dy));
+      return d>r ? [cx0+dx/d*r, cy0+dy/d*r] : [px,py];
+    });
+    cx.beginPath(); cx.moveTo(corners[0][0],corners[0][1]);
+    for(let i=1;i<corners.length;i++) cx.lineTo(corners[i][0],corners[i][1]);
+    cx.closePath(); cx.strokeStyle='rgba(255,255,255,.75)'; cx.lineWidth=2; cx.stroke();
+    return;
+  }
+  cx.strokeStyle='rgba(255,255,255,.82)'; cx.lineWidth=2; cx.strokeRect(x,y,w,h);
+}
+function drawMiniEntities(view,mx,my,mode){
+  const circleClip = mode==='radar', rClip=view.size/2-5, cx0=mx+view.size/2, cy0=my+view.size/2;
+  const visible=p=>p.visible && (!circleClip || Math.hypot(p.x-cx0,p.y-cy0)<=rClip);
+  const radarAlpha=p=>circleClip ? clamp(1 - (Math.hypot(p.x-cx0,p.y-cy0)/rClip)*0.45, 0.55, 1) : 1;
+  for(const g of gems){
+    if(g.coin) continue;
+    const p=miniProject(view,g.x,g.y,mx,my); if(!visible(p)) continue;
+    cx.globalAlpha=radarAlpha(p);
+    if(mode==='card'){
+      if(g.heart) miniCardHeartIcon(p.x,p.y,!!g.big);
+      else if(g.magnet) miniCardMagnetIcon(p.x,p.y);
+      else miniCardOrbIcon(p.x,p.y,g.tier||1);
+    }
+    else if(g.heart) miniCardHeartIcon(p.x,p.y,!!g.big);
+    else if(g.magnet) miniCardMagnetIcon(p.x,p.y);
+    else miniDisc(p.x,p.y,mode==='radar'?2.4:2.2,'#62dfff','#081018',1.2);
+  }
+  for(const lb of luckies){
+    const p=miniProject(view,lb.x,lb.y,mx,my); if(!visible(p)) continue;
+    cx.globalAlpha=radarAlpha(p);
+    if(mode==='card') miniCardLuckyIcon(p.x,p.y,!!lb.heavy);
+    else miniDiamond(p.x,p.y,mode==='radar'?4:4.5,'#ffd24a','#2a1c10');
+  }
+  for(const e of enemies){
+    const p=miniProject(view,e.x,e.y,mx,my); if(!visible(p)) continue;
+    cx.globalAlpha=radarAlpha(p);
+    if(mode==='card'){
+      if(e.isBoss) miniCardBossIcon(p.x,p.y);
+      else miniCardEnemyIcon(p.x,p.y,false,curWorld().enemyTint);
+    } else if(e.isBoss){
+      miniDisc(p.x,p.y,mode==='radar'?6:6.5,'#ff4bd8','#fff',2);
+      cx.strokeStyle='#2a061f'; cx.lineWidth=2; cx.beginPath(); cx.arc(p.x,p.y,(mode==='radar'?9:10),0,TAU); cx.stroke();
+    } else {
+      miniDisc(p.x,p.y,mode==='radar'?3.2:3,'#ff5b4a','#140606',1.5);
+    }
   }
   cx.globalAlpha=1;
+  if(mode!=='card'){
+    const pp = view.challenger ? {x:mx+view.size/2,y:my+view.size/2,visible:true} : miniProject(view,P.x,P.y,mx,my);
+    miniDisc(pp.x,pp.y,7,'#fff','#2a1c10',2.4); miniDisc(pp.x,pp.y,3.2,'#5fbf52',null,0);
+  }
+}
+function drawMiniArena(view,mx,my){
+  if(!arena || view.challenger) return;
+  cx.strokeStyle='rgba(255,42,42,.9)'; cx.lineWidth=2.5; cx.setLineDash([6,5]);
+  cx.strokeRect(mx+arena.x*view.sx, my+arena.y*view.sy, arena.w*view.sx, arena.h*view.sy);
+  cx.setLineDash([]);
+}
+function drawMinimap(){
+  const g=minimapGeom(), ms=g.ms, mx=g.mx, my=g.my;
+  const view=MMH.buildMinimapView({ gameMode, world:WORLD, player:P, size:ms });
+  cx.save(); cx.globalAlpha=1;
+  drawMinimapCard(view,mx,my,ms);
+  cx.restore();
+}
+function drawMinimapCard(view,mx,my,ms){
+  miniRoundRect(mx-4,my-4,ms+8,ms+8,15,'#2a1c10',null,0);
+  miniRoundRect(mx,my,ms,ms,11,curTheme.tile1||'#76bf42',null,0);
+  cx.save();
+  cx.beginPath(); cx.roundRect(mx,my,ms,ms,11); cx.clip();
+  const tile=Math.max(22,Math.round(ms/6));
+  for(let y=0;y<ms;y+=tile){
+    for(let x=0;x<ms;x+=tile){
+      cx.fillStyle=((x/tile+y/tile)&1) ? (curTheme.tile2||'#82c84a') : (curTheme.tile1||'#76bf42');
+      cx.fillRect(mx+x,my+y,Math.min(tile,ms-x),Math.min(tile,ms-y));
+    }
+  }
+  drawMiniArena(view,mx,my);
+  drawMiniCamera(view,mx,my,false);
+  drawMiniEntities(view,mx,my,'card');
+  cx.restore();
+  miniRoundRect(mx-4,my-4,ms+8,ms+8,15,null,'#2a1c10',3.2);
 }
 
 // ============ MAIN LOOP ============
