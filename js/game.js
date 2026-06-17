@@ -1528,7 +1528,8 @@ function openLevelUp(){
     // star rating row (filled = the level you currently have, before this pick) — capped to
     // this card's actual max levels, not a flat 5, so a 3-step ability doesn't show dead slots
     const total = u.evo ? u.steps.length+1 : (u.cap||5);
-    let stars=''; for(let i=0;i<total;i++) stars += `<span class="cstar${i < owned ? ' on' : ''}">★</span>`;
+    const ownedForStars = m.evolve ? total : owned;   // EVOLVE pick = card maxed out, show all stars filled
+    let stars=''; for(let i=0;i<total;i++) stars += `<span class="cstar${i < ownedForStars ? ' on' : ''}">★</span>`;
     const tag = m.evolve ? 'EVO!' : (owned===0 ? 'New!' : m.label);
     d.innerHTML = `<div class="chead"><span class="cnew">${tag}</span>${m.name}</div>`+
                   `<div class="cmid"><img class="cicon" draggable="false" src="${ic}"><div class="cdesc">${m.desc}</div></div>`+
