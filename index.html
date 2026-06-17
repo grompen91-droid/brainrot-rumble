@@ -92,6 +92,19 @@
           <button id="sdrop-deathshake" class="sdrop-toggle" type="button">Death Shake: On</button>
         </div>
       </div>
+      <div class="sdrop-sep"></div>
+      <div class="sdrop-section">
+        <button id="sdrop-changelog" class="sdrop-btn" type="button">Update Log</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Update Log modal — reuses the .sdrop-inner shell -->
+  <div id="changelogdrop" class="hidden">
+    <div class="sdrop-inner">
+      <div class="sdrop-title">UPDATE LOG</div>
+      <button class="sdrop-close" id="changelog-close" type="button" aria-label="Close">✕</button>
+      <div id="changelog-list" class="changelog-list"></div>
     </div>
   </div>
 
@@ -292,6 +305,7 @@
 <script src="js/supabase-config.js"></script>
 
 <!-- Character/pet/recruit systems: load before core so their globals are available to game.js and shop.js -->
+<script src="js/changelog.js"></script>
 <script src="js/hooks.js"></script>
 <script src="js/characters.js"></script>
 <script src="js/pets.js"></script>

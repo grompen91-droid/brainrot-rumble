@@ -194,3 +194,19 @@ _stroke(ctx, size)  // apply the standard dark outline to whatever path is open
 | `fantasma` | Fantasma | world (9) | Phase shift dash (invincible, slows time) |
 | `il_cecchino` | Il Cecchino | world (3) | 3× dmg, 5× fire delay, 60 HP, 1.5× gear dmg, no split shots |
 | `il_campione` | Il Campione | world (10) | 12% kills → mini lucky block, boss kills → +2 dmg |
+
+---
+
+## Update Log & Versioning (read this on every push)
+
+The game has an in-game Update Log: Settings → "Update Log" (`#changelogdrop` in `index.html`, wired in `js/game.js`). Its data lives in `js/changelog.js` (`CURRENT_VERSION` + `CHANGELOG` array, newest entry first).
+
+**Every push that changes the game must:**
+1. Add a new entry to the top of `CHANGELOG` in `js/changelog.js` — one short, player-facing line describing what changed.
+2. Bump `CURRENT_VERSION` using this rule:
+   - **Patch / bugfix** → `+0.01` (e.g. `1.21` → `1.22`)
+   - **Small update / feature** → `+0.1` (e.g. `1.21` → `1.31`)
+   - **Big update / rework** → `+1.0` (e.g. `1.31` → `2.31`)
+3. Set the new entry's `v` to the new `CURRENT_VERSION`.
+
+This applies to every push that changes gameplay, UI, balance, or fixes a bug — not doc-only or comment-only changes.

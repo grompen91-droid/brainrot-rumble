@@ -4029,6 +4029,19 @@ function setDeathShake(v){
   if(closeBtn) closeBtn.addEventListener('click', close);
   drop.addEventListener('click', e=>{ if(e.target===drop) close(); });
 })();
+// Update Log modal
+(function(){
+  const openBtn=$('sdrop-changelog'), drop=$('changelogdrop'), closeBtn=$('changelog-close'), list=$('changelog-list');
+  if(!openBtn||!drop) return;
+  if(list && typeof CHANGELOG!=='undefined'){
+    list.innerHTML = CHANGELOG.map(e=>
+      `<div class="changelog-row"><span class="changelog-v">v${e.v}</span><span class="changelog-notes">${e.notes}</span></div>`
+    ).join('');
+  }
+  openBtn.addEventListener('click', ()=>{ $('settingsdrop').classList.add('hidden'); drop.classList.remove('hidden'); });
+  if(closeBtn) closeBtn.addEventListener('click', ()=>drop.classList.add('hidden'));
+  drop.addEventListener('click', e=>{ if(e.target===drop) drop.classList.add('hidden'); });
+})();
 const _dm=$('sdrop-music'); if(_dm) _dm.addEventListener('click',()=>setMusicMuted(!muted));
 const _ds=$('sdrop-sfx'); if(_ds) _ds.addEventListener('click',()=>setSfxMuted(!sfxMuted));
 const _dds=$('sdrop-deathshake'); if(_dds) _dds.addEventListener('click',()=>setDeathShake(!deathShakeOn));
