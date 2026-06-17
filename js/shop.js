@@ -445,18 +445,19 @@ function renderInventory(){
   // controls: sort chips + one-tap auto-equip
   const ctl=$('eqcontrols');
   if(ctl){
+    const gearVisible = typeof gearForceVisible!=='undefined' && gearForceVisible;
     ctl.innerHTML = '<span class="sortlbl">Sort</span>'+
       ['rarity','stat','slot'].map(s=>'<button class="chip2'+(invSort===s?' on':'')+'" data-sort="'+s+'">'+SORT_LABEL[s]+'</button>').join('')+
       '<button class="chip2 fuseaction'+(fuseSelectMode?' on':'')+'" id="fusemode"><img class="cic" src="'+icURL('ic_crate')+'">Fuse</button>'+
       '<button class="chip2 auto" id="autoeq"><img class="cic" src="'+icURL('ic_bolt')+'">Auto-Equip</button>'+
-      '<button class="chip2'+(gearForceVisible?' on':'')+'" id="gearvis">Show Armor: '+(gearForceVisible?'On':'Off')+'</button>'+
+      '<button class="chip2'+(gearVisible?' on':'')+'" id="gearvis">Show Armor: '+(gearVisible?'On':'Off')+'</button>'+
       renderFuseStatus();
     ctl.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{ invSort=b.dataset.sort; if(typeof sfx!=='undefined') sfx.pick(); renderInventory(); }));
     const ae=$('autoeq'); if(ae) ae.addEventListener('click', autoEquipBest);
     const fm=$('fusemode'); if(fm) fm.addEventListener('click',()=>{ fuseSelectMode=!fuseSelectMode; if(!fuseSelectMode) fuseSelected.clear(); if(typeof sfx!=='undefined') sfx.pick(); renderInventory(); });
     const fb=$('fusebtn'); if(fb) fb.addEventListener('click', openFuseConfirm);
     const fc=$('fuseclear'); if(fc) fc.addEventListener('click',()=>{ fuseSelected.clear(); renderInventory(); });
-    const gv=$('gearvis'); if(gv) gv.addEventListener('click',()=>{ setGearForceVisible(!gearForceVisible); if(typeof sfx!=='undefined') sfx.pick(); renderInventory(); if(typeof refreshMenuChar==='function') refreshMenuChar(); });
+    const gv=$('gearvis'); if(gv) gv.addEventListener('click',()=>{ if(typeof setGearForceVisible==='function') setGearForceVisible(!gearVisible); if(typeof sfx!=='undefined') sfx.pick(); renderInventory(); if(typeof refreshMenuChar==='function') refreshMenuChar(); });
   }
 
   const list=sortedOwned();
