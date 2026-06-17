@@ -226,17 +226,15 @@ function renderPetRecruitSection() {
   const poor=gemBalance<PET_PULL_COST;
   const gem='<span class="gemico-sm">◆</span>';
   const featured=dailyFeaturedPet();
-  const hoursLeft=_hoursUntilMidnightUTC();
-  const rarLabel=(typeof RAR!=='undefined'&&RAR[featured.rarity])?RAR[featured.rarity].name:featured.rarity.toUpperCase();
 
   let html='<div class="shopsec">';
   html+='<div class="banner"><span>PET RECRUIT</span></div>';
-  html+='<div class="scard weeklycard weeklycard-v r-'+featured.rarity+'">';
-  html+='<div class="weekly-header"><span class="weeklybadge">FEATURED PET</span><span class="shoptimer weekly-timer">⏱ '+hoursLeft+'h</span></div>';
-  html+='<div class="charport-lg weekly-port pettile" data-petid="'+featured.id+'"><canvas class="pettile-canvas" width="120" height="120"></canvas></div>';
-  html+='<div class="weekly-name">'+featured.name+'</div>';
-  html+='<div class="cstags cstags-center"><span class="rtag r-'+featured.rarity+'">'+rarLabel+'</span></div>';
+  html+='<div class="petgacha">';
+  html+='<div class="petgacha-port pettile" data-petid="'+featured.id+'"><canvas class="pettile-canvas" width="140" height="140"></canvas></div>';
+  html+='<div class="petgacha-right">';
+  html+='<div class="petgacha-title">GET RANDOM PET</div>';
   html+='<button class="pullbtn'+(poor?' poor':'')+'" id="petpullbtn">'+gem+PET_PULL_COST+' — RECRUIT PET</button>';
+  html+='</div>';
   html+='</div>';
   html+='<div class="invhint" style="margin-top:4px">Manage pets in the Equipment tab</div>';
   html+='</div>'; // shopsec

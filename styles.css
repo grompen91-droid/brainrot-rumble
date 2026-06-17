@@ -729,6 +729,18 @@ html,body { width:100%; height:100%; overflow:hidden; background:#6fae3d; font-f
 .gemshopcost { display:flex; align-items:center; gap:4px; font-weight:900; font-size:clamp(12px,2.2vmin,17px); color:#7a3ab8; }
 .gemshopcost .gemico-sm { color:#b06ff0; font-size:1.1em; }
 .weeklycard { border-color:#e0a92e; box-shadow:0 0 14px rgba(224,169,46,.5); background:linear-gradient(160deg,#fef8e8 0%,#fff7d0 100%); }
+/* Pet recruit gacha banner: portrait pops on the left, no name/rarity/box behind it */
+.petgacha { display:flex; align-items:center; gap:clamp(10px,2.2vmin,18px); width:100%;
+  border:4px solid #2a1c10; border-radius:18px; padding:clamp(10px,2vmin,16px);
+  background:linear-gradient(115deg,#7a45cf 0%,#a866f2 45%,#e0a92e 100%);
+  box-shadow:0 6px 0 rgba(0,0,0,.25); overflow:hidden; }
+/* .pettile is reused here only for its JS data-petid hook -- strip its grid-tile box look */
+.petgacha-port.pettile { width:clamp(80px,18vmin,140px); height:clamp(80px,18vmin,140px); flex:0 0 auto;
+  aspect-ratio:auto; border:none; border-radius:0; background:none; box-shadow:none;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,.35)); }
+.petgacha-port.pettile canvas { width:100%; height:100%; }
+.petgacha-right { flex:1; display:flex; flex-direction:column; align-items:flex-start; gap:clamp(8px,1.6vmin,12px); }
+.petgacha-title { font-weight:900; font-size:clamp(16px,3.2vmin,24px); color:#fff; -webkit-text-stroke:.6px #2a1c10; letter-spacing:.02em; }
 /* Big vertical weekly legendary card */
 .weeklycard-v { flex-direction:column; align-items:center; gap:clamp(8px,1.6vmin,14px); text-align:center; padding:clamp(14px,2.8vmin,22px); }
 .weekly-header { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; width:100%; }
