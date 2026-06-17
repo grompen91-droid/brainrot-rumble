@@ -65,7 +65,7 @@ const CRATES = {
 const CRATE_ORDER = ['wood','silver','gold'];
 const GEAR_UID_KEY = 'br_gear_uid_seq';
 const SELL_RATE = 0.4;
-const FUSE_BASE = 30;
+const FUSE_BASE = 20;
 const FUSE_STEP = 10;
 const FUSE_CAP = 100;
 
@@ -168,6 +168,27 @@ function sellGearInstance(uid){
   return true;
 }
 function unseenCount(){ let n=0; for(const inst of gearOwned) if(!gearSeen.has(inst.uid)) n++; return n; }
+
+// ---- character/pet "new unlock" badges -- same seen-set pattern as gear's invbadge ----
+let charSeen = new Set(JSON.parse(localStorage.getItem('br_char_seen')||'[]'));
+function saveCharSeen(){ localStorage.setItem('br_char_seen', JSON.stringify([...charSeen])); }
+function unseenCharCount(){
+  if(typeof CHARACTERS==='undefined' || typeof charIsUnlocked!=='function') return 0;
+  let n=0; for(const c of CHARACTERS) if(charIsUnlocked(c.id) && !charSeen.has(c.id)) n++;
+  return n;
+}
+function updateCharBadge(){ const b=$('charbadge'); if(!b) return; const n=unseenCharCount();
+  b.textContent = n>99?'99+':n; b.classList.toggle('hidden', n<=0); }
+
+let petSeen = new Set(JSON.parse(localStorage.getItem('br_pet_seen')||'[]'));
+function savePetSeen(){ localStorage.setItem('br_pet_seen', JSON.stringify([...petSeen])); }
+function unseenPetCount(){
+  if(typeof PETS==='undefined' || typeof isPetOwned!=='function') return 0;
+  let n=0; for(const p of PETS) if(isPetOwned(p.id) && !petSeen.has(p.id)) n++;
+  return n;
+}
+function updatePetBadge(){ const b=$('petbadge'); if(!b) return; const n=unseenPetCount();
+  b.textContent = n>99?'99+':n; b.classList.toggle('hidden', n<=0); }
 function updateInvBadge(){ const b=$('invbadge'); if(!b) return; const n=unseenCount();
   b.textContent = n>99?'99+':n; b.classList.toggle('hidden', n<=0); }
 
@@ -237,6 +258,18 @@ const STAT_IC = { dmg:'ic_dmg', hp:'ic_hp', speed:'ic_spd', range:'ic_rng' };
 function rtagHTML(rar){ return '<span class="rtag r-'+rar+'">'+RAR[rar].name+'</span>'; }
 function statTag(stat){ return '<span class="stag s-'+stat+'">'+STAT[stat].short+'</span>'; }
 
+// ---- free daily coins ----
+const DAILY_COINS_AMOUNT=100;
+function _utcDateKey(){ const d=new Date(); return d.getUTCFullYear()+'-'+(d.getUTCMonth()+1)+'-'+d.getUTCDate(); }
+function dailyCoinsClaimed(){ return localStorage.getItem('br_daily_coins_date')===_utcDateKey(); }
+function claimDailyCoins(){
+  if(dailyCoinsClaimed()) return false;
+  gold+=DAILY_COINS_AMOUNT; saveGold(); if(window.markDirty) window.markDirty();
+  localStorage.setItem('br_daily_coins_date', _utcDateKey());
+  refreshGoldUI();
+  return true;
+}
+
 // ============ PURCHASING ============
 function buyItem(id, price){
   if(hasItemId(id) || gold<price) return false;
@@ -258,14 +291,22 @@ function shopCardHTML(id, price){
   return '<div class="scard r-'+rar+(owned?' owned':'')+'">'+ribbon+
     '<div class="sname">'+itemName(id)+'</div>'+
     '<div class="sicon"><img src="'+gearIconURL(id)+'" alt=""></div>'+
-    '<div class="stagrow">'+rtagHTML(rar)+statTag(itemStat(id))+'</div>'+
+    '<div class="stagrow">'+rtagHTML(rar)+statTag(itemStat(id))+'<span class="sbonus">'+itemBonusShort(id)+'</span></div>'+
     action+'</div>';
 }
 
 function renderShop(){
   const grid=$('shopgrid'); if(!grid) return;
+  // ---- FREE DAILY COINS ----
+  const claimed=dailyCoinsClaimed();
+  let html = '<div class="banner"><span>FREE DAILY COINS</span></div>';
+  html += '<div class="dailycoins'+(claimed?' claimed':'')+'">'+
+    '<div class="dcrow">'+coinTag()+'<span class="dcamt">+'+DAILY_COINS_AMOUNT+'</span></div>'+
+    (claimed ? '<div class="dcclaimed">Claimed — resets in '+_hoursUntilMidnightUTC()+'h</div>'
+             : '<button class="bigbtn green" id="dailycoinsbtn">CLAIM</button>')+
+    '</div>';
   // ---- DAILY SHOP (rotating, discounted) ----
-  let html = '<div class="banner"><span>DAILY SHOP</span></div><div class="shopsub">Resets at midnight (UTC) · up to -25%</div>';
+  html += '<div class="banner"><span>DAILY SHOP</span></div><div class="shopsub">Resets at midnight (UTC) · up to -25%</div>';
   html += '<div class="ggrid">';
   for(const id of dailyShop(6)) html += shopCardHTML(id, featuredPrice(id));
   html += '</div>';
@@ -284,6 +325,7 @@ function renderShop(){
   html += (typeof renderPetRecruitSection==='function') ? renderPetRecruitSection() : '';
   grid.innerHTML = html;
 
+  const dcb=$('dailycoinsbtn'); if(dcb) dcb.addEventListener('click',()=>{ if(claimDailyCoins()){ if(typeof sfx!=='undefined') sfx.coin(); renderShop(); } });
   grid.querySelectorAll('button.sbuy[data-id]').forEach(b=>b.addEventListener('click',()=>buyItem(b.dataset.id, +b.dataset.price)));
   grid.querySelectorAll('button[data-crate]').forEach(b=>b.addEventListener('click',()=>openCrate(b.dataset.crate)));
   grid.querySelectorAll('button[data-crinfo]').forEach(b=>b.addEventListener('click',(e)=>{ e.stopPropagation(); openCrateOdds(b.dataset.crinfo); }));
@@ -403,16 +445,19 @@ function renderInventory(){
   // controls: sort chips + one-tap auto-equip
   const ctl=$('eqcontrols');
   if(ctl){
+    const gearVisible = typeof gearForceVisible!=='undefined' && gearForceVisible;
     ctl.innerHTML = '<span class="sortlbl">Sort</span>'+
       ['rarity','stat','slot'].map(s=>'<button class="chip2'+(invSort===s?' on':'')+'" data-sort="'+s+'">'+SORT_LABEL[s]+'</button>').join('')+
       '<button class="chip2 fuseaction'+(fuseSelectMode?' on':'')+'" id="fusemode"><img class="cic" src="'+icURL('ic_crate')+'">Fuse</button>'+
       '<button class="chip2 auto" id="autoeq"><img class="cic" src="'+icURL('ic_bolt')+'">Auto-Equip</button>'+
+      '<button class="chip2'+(gearVisible?' on':'')+'" id="gearvis">Show Armor: '+(gearVisible?'On':'Off')+'</button>'+
       renderFuseStatus();
     ctl.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{ invSort=b.dataset.sort; if(typeof sfx!=='undefined') sfx.pick(); renderInventory(); }));
     const ae=$('autoeq'); if(ae) ae.addEventListener('click', autoEquipBest);
     const fm=$('fusemode'); if(fm) fm.addEventListener('click',()=>{ fuseSelectMode=!fuseSelectMode; if(!fuseSelectMode) fuseSelected.clear(); if(typeof sfx!=='undefined') sfx.pick(); renderInventory(); });
     const fb=$('fusebtn'); if(fb) fb.addEventListener('click', openFuseConfirm);
     const fc=$('fuseclear'); if(fc) fc.addEventListener('click',()=>{ fuseSelected.clear(); renderInventory(); });
+    const gv=$('gearvis'); if(gv) gv.addEventListener('click',()=>{ if(typeof setGearForceVisible==='function') setGearForceVisible(!gearVisible); if(typeof sfx!=='undefined') sfx.pick(); renderInventory(); if(typeof refreshMenuChar==='function') refreshMenuChar(); });
   }
 
   const list=sortedOwned();
@@ -582,34 +627,44 @@ function renderCharacterTab() {
   const list=$('charlist'); if(!list) return;
   if(typeof CHARACTERS==='undefined') return;
   const rarRank={common:0,uncommon:1,rare:2,epic:3,legendary:4,mythic:5,world:-1};
-  // Sort into 3 groups
-  const owned=[], worldLocked=[], shopLocked=[];
+  // Sort into 4 groups
+  // gating (progression-locked) is decided by which threshold field is set, not by the cosmetic rarity tag —
+  // lets a character carry a real rarity (e.g. Fortunato is 'epic') while still being a world/challenger unlock
+  const owned=[], worldLocked=[], chalLocked=[], shopLocked=[];
   for(const char of CHARACTERS){
-    const isWorld=char.rarity==='world';
-    const unlocked=isWorld?(typeof charIsUnlocked==='function'?charIsUnlocked(char.id):false):isCharOwned(char.id);
+    const isWorld=char.worldUnlock!=null;
+    const isChal=char.chalWorldUnlock!=null;
+    const unlocked=typeof charIsUnlocked==='function'?charIsUnlocked(char.id):(isWorld||isChal?false:isCharOwned(char.id));
     if(unlocked) owned.push(char);
     else if(isWorld) worldLocked.push(char);
+    else if(isChal) chalLocked.push(char);
     else shopLocked.push(char);
   }
   owned.sort((a,b)=>{
-    const aw=a.rarity==='world', bw=b.rarity==='world';
+    const aw=a.worldUnlock!=null||a.chalWorldUnlock!=null, bw=b.worldUnlock!=null||b.chalWorldUnlock!=null;
     if(aw&&bw) return ((a.worldUnlock??a.chalWorldUnlock??0))-(b.worldUnlock??b.chalWorldUnlock??0);
     if(aw) return -1; if(bw) return 1;
     return (rarRank[b.rarity]||0)-(rarRank[a.rarity]||0);
   });
-  worldLocked.sort((a,b)=>((a.worldUnlock??a.chalWorldUnlock??0))-(b.worldUnlock??b.chalWorldUnlock??0));
+  worldLocked.sort((a,b)=>(a.worldUnlock??0)-(b.worldUnlock??0));
+  chalLocked.sort((a,b)=>(a.chalWorldUnlock??0)-(b.chalWorldUnlock??0));
   shopLocked.sort((a,b)=>(rarRank[b.rarity]||0)-(rarRank[a.rarity]||0));
 
   function buildCard(char, locked){
-    const isWorld=char.rarity==='world';
+    const isWorld=char.worldUnlock!=null;
+    const isChal=char.chalWorldUnlock!=null;
+    // 'world'/'challenger' are placeholder rarity tags (no real tier) and get a forced badge color;
+    // a gated character with a real rarity (e.g. Fortunato: epic) keeps its own color/tag.
+    const placeholderRar=char.rarity==='world'?'uncommon':char.rarity==='challenger'?'rare':char.rarity;
+    const rarClass='r-'+placeholderRar;
     const selected=(typeof activeCharId!=='undefined')&&activeCharId===char.id;
-    const rarClass=isWorld?'r-uncommon':'r-'+char.rarity;
     const thumbId='charport_'+char.id;
     const portHtml='<div class="charport"><canvas id="'+thumbId+'" width="80" height="80"></canvas></div>';
     let selBtn='';
     if(locked&&isWorld){
-      const lockLbl=char.chalWorldUnlock!=null?'Challenger World '+char.chalWorldUnlock:'World '+(char.worldUnlock+1);
-      selBtn='<button class="charselbtn locked" disabled>'+lockLbl+' unlock</button>';
+      selBtn='<button class="charselbtn locked" disabled>World '+char.worldUnlock+' unlock</button>';
+    } else if(locked&&isChal){
+      selBtn='<button class="charselbtn locked" disabled>Challenger World '+char.chalWorldUnlock+' unlock</button>';
     } else if(locked){
       selBtn='<button class="charselbtn locked" disabled>Get in Shop</button>';
     } else if(selected){
@@ -617,13 +672,13 @@ function renderCharacterTab() {
     } else {
       selBtn='<button class="charselbtn" data-selchar="'+char.id+'">SELECT</button>';
     }
-    const lockLabel=char.chalWorldUnlock!=null?'Beat Challenger World '+char.chalWorldUnlock:'Beat World '+(char.worldUnlock+1);
-    const lockBadge=locked&&isWorld?'<span class="charlockbadge">'+lockLabel+'</span>':'';
+    const lockBadge=locked&&isWorld?'<span class="charlockbadge">Beat World '+char.worldUnlock+'</span>'
+      :locked&&isChal?'<span class="charlockbadge">Beat Challenger World '+char.chalWorldUnlock+'</span>':'';
     let html='<div class="charcard '+rarClass+(selected?' selected':'')+(locked?' locked':'')+'" id="charcard_'+char.id+'">';
     html+=portHtml;
     html+='<div class="charinfo"><div class="charname">'+char.name+'</div>';
     html+='<div class="chardesc">'+char.desc+'</div>';
-    html+='<div class="chartags">'+rtagHTML(isWorld?'uncommon':char.rarity)+lockBadge+'</div>';
+    html+='<div class="chartags">'+rtagHTML(placeholderRar)+lockBadge+'</div>';
     html+='</div>';
     html+=selBtn+'</div>';
     return html;
@@ -638,13 +693,17 @@ function renderCharacterTab() {
     html+='<div class="banner"><span>WORLD UNLOCKS</span></div>';
     for(const c of worldLocked) html+=buildCard(c,true);
   }
+  if(chalLocked.length){
+    html+='<div class="banner"><span>CHALLENGER</span></div>';
+    for(const c of chalLocked) html+=buildCard(c,true);
+  }
   if(shopLocked.length){
     html+='<div class="banner"><span>GET IN SHOP</span></div>';
     for(const c of shopLocked) html+=buildCard(c,true);
   }
   list.innerHTML=html;
   // Render thumbnails
-  const allChars=[...owned,...worldLocked,...shopLocked];
+  const allChars=[...owned,...worldLocked,...chalLocked,...shopLocked];
   for(const char of allChars){
     const canvas=document.getElementById('charport_'+char.id);
     if(!canvas) continue;
@@ -808,9 +867,9 @@ function showTab(name){
   document.querySelectorAll('#tabbar .tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
   const menu=$('menu'); if(menu) menu.setAttribute('data-tab', name);   // per-tab background tint
   if(name==='shop') renderShop();
-  if(name==='pets') renderPetsTab();
+  if(name==='pets'){ renderPetsTab(); petSeen=new Set(PETS.filter(p=>isPetOwned(p.id)).map(p=>p.id)); savePetSeen(); updatePetBadge(); }
   if(name==='inventory'){ gearSeen=new Set(gearOwned.map(x=>x.uid)); saveSeen(); updateInvBadge(); renderInventory(); renderPetSection(); }   // mark all seen -> clear badge
-  if(name==='character') renderCharacterTab();
+  if(name==='character'){ renderCharacterTab(); charSeen=new Set(CHARACTERS.filter(c=>charIsUnlocked(c.id)).map(c=>c.id)); saveCharSeen(); updateCharBadge(); }
 }
 document.querySelectorAll('#tabbar .tabbtn').forEach(b=>b.addEventListener('click',()=>{ showTab(b.dataset.tab); if(typeof sfx!=='undefined') sfx.pick(); }));
 const _crclaim=$('crclaim'); if(_crclaim) _crclaim.addEventListener('click', closeCrate);

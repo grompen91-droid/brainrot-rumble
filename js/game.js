@@ -4,6 +4,7 @@ let shake = 0, hitFlash = 0, hitstop = 0, tPrev = 0, elapsed = 0;
 
 const P = {}; // player
 let bullets=[], ebullets=[], petBullets=[], enemies=[], gems=[], parts=[], texts=[], zones=[], holes=[], luckies=[];
+let skibidiBullets=[], skibidiTimers=[];   // Skibidi Toilet card: edge-bouncing persistent bullets, own lifecycle
 let timeScale=1.0;
 let _vis=[];   // reused per-frame scratch list of visible enemies (depth sort) — avoids GC churn
 let wave=1, kills=0, spawnTimer=0, waveEnemiesLeft=0, betweenWaves=false, boss=null;
@@ -11,12 +12,21 @@ let worldCoins=0;   // coins collected during the CURRENT world run (in-game HUD
 let _lastSec=-1;    // throttles the survival-timer DOM update to once per second
 const MMH = window.MINIMAP_HELPERS;
 // ===== CHALLENGER MODE STATE =====
-let gameMode = 'story';     // 'story' | 'challenger'
+let gameMode = 'story';     // 'story' | 'challenger' | 'practice'
 let chalElapsed = 0;        // challenger timer — pauses during boss fights
 let chalBossIdx = 0;        // index of next boss milestone (0-3 → 5/10/15/20 min)
 let chalBossActive = false; // true while a challenger boss is alive
 let chalLuckyT = 0;         // countdown to next lucky block batch in challenger
 const CHAL_BOSS_TIMES = [300, 600, 900, 1200];  // seconds: 5/10/15/20 min
+
+// ===== PRACTICE MODE STATE =====
+// Sandbox gamemode: no rewards, single customizable "world", reuses the challenger
+// engine (continuous spawn / elapsed-time boss milestones / infinite map) when toggled on.
+let practiceCfg = { infiniteWaves:true, timerBased:false, infiniteMap:false, bossIntervalSec:300, foes:null, bosses:null, _foeSet:null, _bossSet:null };
+function timerMode(){ return gameMode==='challenger' || (gameMode==='practice' && practiceCfg.timerBased); }
+function infiniteMapMode(){ return gameMode==='challenger' || (gameMode==='practice' && practiceCfg.infiniteMap); }
+function nextBossTimeSec(){ return gameMode==='practice' ? practiceCfg.bossIntervalSec*(chalBossIdx+1) : (CHAL_BOSS_TIMES[chalBossIdx]||300); }
+function hasMoreMilestones(){ return gameMode==='practice' ? true : chalBossIdx<CHAL_BOSS_TIMES.length; }
 // Challenger needs story world 3 cleared; its own progression is independent after that
 const _storyP = +(localStorage.getItem('br_unlocked')||0);
 let chalUnlocked = _storyP >= 3
@@ -50,6 +60,9 @@ function saveGold(){ localStorage.setItem('br_gold', gold); localStorage.setItem
 // boss arena: the field locks to a small bounded square a few seconds before the boss arrives
 let arena=null, bossPending=0;
 const ARENA_SIZE=1000, ARENA_LEAD=4, ARENA_ZOOM=1.3;
+const STEALTH_RADIUS=260;   // Fantasma: enemies only notice him within this range (or once shot)
+const CHAL_ARENA_MUL=1.6;                          // challenger boss arenas are roomier than story mode
+const FINAL_ARENA_GROW=1.5, CHAL_FINAL_ARENA_GROW=2.2;   // phase-3 arena growth factor; challenger gets an even bigger blowout
 const FINAL_CHARGE=2.6;   // seconds a final boss spends invincible & still before its phase-3 onslaught
 const BOSS_WIND=0.9;      // boss attack wind-up: how long the telegraph shows before the move fires
 // XP orb tiers (index = tier). Enemies drop one orb; tier scales with their xp value.
@@ -417,7 +430,14 @@ const WORLDS = [
     foes:FOES_DIRT, bosses:BOSSES_DIRT },
 ];
 let worldIdx = 0;
-function curWorld(){ return WORLDS[worldIdx]; }
+// Practice's single "world" — a mutable stand-in whose foes/bosses get overwritten by the
+// customize popup right before each run, and whose theme/map are just Grasslands' (cosmetic only).
+const TRAINING_WORLD = {
+  id:'training', name:'TRAINING GROUNDS', band:0, endless:true, waveTarget:20,
+  map:{w:2600,h:2600}, theme:WORLDS[0].theme,
+  foes:WORLDS[0].foes, bosses:WORLDS[0].bosses,
+};
+function curWorld(){ return gameMode==='practice' ? TRAINING_WORLD : WORLDS[worldIdx]; }
 let curFoes   = WORLDS[0].foes;
 let curBosses = WORLDS[0].bosses;
 let curTheme  = WORLDS[0].theme;
@@ -439,33 +459,37 @@ function loadWorld(idx){
 let cut = null;   // cutscene state
 let _clearData = null;
 function worldCleared(boss){
-  const prevUnlocked = unlockedMax;
-  unlockedMax = Math.min(WORLDS.length-1, Math.max(unlockedMax, worldIdx+1));
-  localStorage.setItem('br_unlocked', unlockedMax); if(window.markDirty) window.markDirty();
-  selWorld = Math.min(WORLDS.length-1, worldIdx+1);
-  // One-time 5-gem reward per world cleared
-  const gwKey='br_gem_w'+worldIdx;
-  let gemsEarned=0;
-  if(!localStorage.getItem(gwKey) && typeof addGems==='function'){
-    gemsEarned=5; addGems(5); localStorage.setItem(gwKey,'1');
-    bigText('+5 ◆ GEMS','#b06ff0');
+  const isPractice = gameMode==='practice';
+  let gemsEarned=0, newChars=[];
+  if(!isPractice){   // practice grants no persistent progress at all
+    const prevUnlocked = unlockedMax;
+    unlockedMax = Math.min(WORLDS.length-1, Math.max(unlockedMax, worldIdx+1));
+    localStorage.setItem('br_unlocked', unlockedMax); if(window.markDirty) window.markDirty();
+    selWorld = Math.min(WORLDS.length-1, worldIdx+1);
+    // One-time 5-gem reward per world cleared
+    const gwKey='br_gem_w'+worldIdx;
+    if(!localStorage.getItem(gwKey) && typeof addGems==='function'){
+      gemsEarned=5; addGems(5); localStorage.setItem(gwKey,'1');
+      bigText('+5 ◆ GEMS','#b06ff0');
+    }
+    newChars = typeof CHARACTERS!=='undefined'
+      ? CHARACTERS.filter(c => {
+          if(c.rarity!=='world' || c.worldUnlock==null) return false;
+          const hadBefore = c.worldUnlock<=prevUnlocked || (typeof isCharOwned==='function' && isCharOwned(c.id));
+          return !hadBefore && c.worldUnlock<=unlockedMax;
+        })
+      : [];
   }
-  const newChars = typeof CHARACTERS!=='undefined'
-    ? CHARACTERS.filter(c => {
-        if(c.rarity!=='world' || c.worldUnlock==null) return false;
-        const hadBefore = c.worldUnlock<=prevUnlocked || (typeof isCharOwned==='function' && isCharOwned(c.id));
-        return !hadBefore && c.worldUnlock<=unlockedMax;
-      })
-    : [];
-  _clearData = { worldNum:worldIdx+1, coins:worldCoins, gems:gemsEarned, newChars };
+  _clearData = { worldNum:worldIdx+1, coins:worldCoins, gems:gemsEarned, newChars, isPractice };
+  if(newChars.length && typeof updateCharBadge==='function') updateCharBadge();
   state = ST.CUTSCENE;
   cut = { t:0, boss:boss, alpha:1, fade:0, name:curWorld().name };
   boss.cut = true; boss.deathScale = 1;
   enemies.length=0; enemies.push(boss);   // keep only the dying boss on screen
-  ebullets=[]; bullets=[]; petBullets=[]; zones=[];
+  ebullets=[]; bullets=[]; petBullets=[]; zones=[]; skibidiBullets.length=0; skibidiTimers.length=0;
   hitstop=0.25; shake=Math.max(shake,16);
   stopMusic(); sfx.win();
-  bigText('WORLD CLEARED', '#ffd24a');
+  bigText(isPractice ? 'TRAINING COMPLETE' : 'WORLD CLEARED', '#ffd24a');
 }
 function cutsceneUpdate(dt){
   computeCamera();
@@ -484,7 +508,7 @@ function cutsceneUpdate(dt){
 function toMenuFromClear(){
   if(!_clearData){ quitToMenu(); triggerUnlockReveal(); return; }
   const d=_clearData; _clearData=null;
-  $('wc-title').textContent = d.isChallenger ? 'WORLD '+d.worldNum+' CHALLENGER!' : 'WORLD '+d.worldNum+' CLEARED!';
+  $('wc-title').textContent = d.isPractice ? 'TRAINING COMPLETE' : d.isChallenger ? 'WORLD '+d.worldNum+' CHALLENGER!' : 'WORLD '+d.worldNum+' CLEARED!';
   $('wc-coins').textContent = d.coins;
   // Set coin icon from sprite (no emoji)
   const coinIco=$('wc-coinico');
@@ -502,8 +526,111 @@ function toMenuFromClear(){
   } else { unlockEl.classList.add('hidden'); }
   $('world-cleared').classList.remove('hidden');
 }
+
+// ============================================================
+// INTRO CUTSCENE — plays once, before the very first World 1 run.
+// Pure screen-space drawing (no world/camera), driven by a fixed stage timeline.
+// ============================================================
+const INTRO_DUR = 15;
+let introT = 0, introDone = null;
+const INTRO_HUMANS = [
+  {x:0.28,y:0.62,p:0}, {x:0.42,y:0.74,p:1.4}, {x:0.58,y:0.58,p:2.6},
+  {x:0.66,y:0.72,p:0.7}, {x:0.36,y:0.5,p:3.3}, {x:0.5,y:0.66,p:2.0},
+];
+const INTRO_ARMY = ['pigeon','chimp','penguin','flamingo','duck','pigeon'];
+function easeOut(t){ return 1-(1-t)*(1-t); }
+function startIntro(onDone){
+  introT=0; introDone=onDone; state=ST.INTRO;
+  $('menu').classList.add('hidden');
+  $('introskip').classList.remove('hidden');
+  playMusic('boss0'); shake=0;
+}
+function finishIntro(){
+  $('introskip').classList.add('hidden');
+  localStorage.setItem('br_seen_intro','1');
+  const cb=introDone; introDone=null;
+  if(cb) cb();
+}
+function introUpdate(dt){ introT+=dt; if(introT>=INTRO_DUR) finishIntro(); }
+// caption alpha: fades in over 0.4s, holds, fades out 0.4s before the window ends
+function introCaptionAlpha(t,t0,t1){
+  if(t<t0||t>t1) return 0;
+  return Math.min(1,(t-t0)/0.4,(t1-t)/0.4);
+}
+function introCaption(str,t,t0,t1,y){
+  const a=introCaptionAlpha(t,t0,t1); if(a<=0) return;
+  let fs=Math.round(Math.min(W,H)*0.045);
+  cx.textAlign='center'; cx.font='900 '+fs+'px sans-serif';
+  const maxW=W*0.92;
+  if(cx.measureText(str).width>maxW){ fs=Math.max(11,Math.floor(fs*maxW/cx.measureText(str).width)); cx.font='900 '+fs+'px sans-serif'; }
+  cx.globalAlpha=a;
+  cx.lineWidth=5; cx.strokeStyle='#000'; cx.strokeText(str,W/2,y);
+  cx.fillStyle='#fff'; cx.fillText(str,W/2,y);
+  cx.globalAlpha=1;
+}
+function introRender(){
+  const t=introT;
+  // local screen-shake (NOT the shared `shake` global — that's decayed by update(), which never
+  // runs during ST.INTRO, so writing to it here would leak a stuck shake into the real game after)
+  const introShakeAmt = (t>7 && t<11) ? Math.max(0,(t-7)/3)*10 : 0;
+  cx.save();
+  if(introShakeAmt>0) cx.translate(rand(-introShakeAmt,introShakeAmt), rand(-introShakeAmt,introShakeAmt));
+  // sky/ground backdrop (grass tones, screen-space, no world dependency)
+  cx.fillStyle='#6fae3d'; cx.fillRect(0,0,W,H);
+  cx.fillStyle='#86c64a';
+  for(let gy=0; gy<H; gy+=64) for(let gx=0; gx<W; gx+=64) if(((gx/64+gy/64)&1)) cx.fillRect(gx,gy,64,64);
+
+  // --- stage 1 (0-3s): peaceful humans wandering ---
+  if(t<8){
+    const fleeT=Math.max(0,t-7);   // they start bolting for the exits once the army gets close
+    for(const h of INTRO_HUMANS){
+      const wob=Math.sin((t+h.p)*1.6)*10;
+      const fx=fleeT>0 ? -fleeT*fleeT*260 : 0;
+      const hx=h.x*W+wob+fx, hy=h.y*H;
+      cx.fillStyle='#e0c39a'; cx.beginPath(); cx.arc(hx,hy,7,0,TAU); cx.fill();
+      cx.fillStyle='#3a2d22'; cx.beginPath(); cx.arc(hx,hy-9,5,0,TAU); cx.fill();
+    }
+  }
+  introCaption('THE WORLD WAS AT PEACE...', t, 0.3, 3.2, H*0.18);
+
+  // --- stage 2 (2.5-9s): Sahur marches in with his army ---
+  if(t>2.5 && t<11){
+    const e=easeOut(Math.min(1,(t-2.5)/5.5));
+    const bossX = W*1.15 - e*(W*0.65), bossY=H*0.56;
+    const closeness=Math.max(0,(t-7)/3);
+    for(let i=0;i<INTRO_ARMY.length;i++){
+      const lag=0.5+i*0.18, e2=easeOut(Math.min(1,Math.max(0,(t-2.5-lag*0.4))/5.5));
+      const ax=W*1.25-e2*(W*0.6)+Math.sin(i*1.7)*30, ay=bossY+70+(i%3)*26-26;
+      if(typeof SP!=='undefined' && SP[INTRO_ARMY[i]]) drawSprite(INTRO_ARMY[i], ax, ay, 46, Math.sin(t*4+i)*0.15, 0,0,false,null);
+    }
+    if(typeof SP!=='undefined' && SP['sahur']) drawSprite('sahur', bossX, bossY, 130+closeness*30, Math.sin(t*3)*0.05, 0,0,false,null);
+  }
+  introCaption('...UNTIL TUNG TUNG TUNG SAHUR\'S ARMY INVADED.', t, 3.6, 8.6, H*0.86);
+
+  // --- stage 3 (9-11.5s): chaos flash ---
+  if(t>9 && t<11.5){
+    cx.globalAlpha=0.16+0.1*Math.sin(t*16); cx.fillStyle='#ff2020'; cx.fillRect(0,0,W,H); cx.globalAlpha=1;
+  }
+  introCaption('BRAINROT IS SPREADING FAST.', t, 9.0, 11.3, H*0.5);
+
+  // --- stage 4 (11.5-15s): hero rises ---
+  if(t>11.5){
+    const a=Math.min(1,(t-11.5)/0.6);
+    cx.globalAlpha=0.5*a*(0.6+0.4*Math.sin(t*5)); cx.strokeStyle='#9fe0ff'; cx.lineWidth=4;
+    cx.beginPath(); cx.arc(W/2,H*0.58,60,0,TAU); cx.stroke(); cx.globalAlpha=1;
+    if(typeof drawCharacter==='function') drawCharacter((typeof activeCharId!=='undefined'?activeCharId:'gianni'), W/2, H*0.58, 90, 0, false);
+  }
+  introCaption('ONE HERO RISES TO STOP THEM.', t, 11.8, 14.2, H*0.86);
+  introCaption('MISSION START', t, 14.0, 15.0, H*0.5);
+
+  // fade to black at the very end, into the real game
+  if(t>14.3){ cx.globalAlpha=Math.min(1,(t-14.3)/0.7); cx.fillStyle='#000'; cx.fillRect(0,0,W,H); cx.globalAlpha=1; }
+  cx.restore();
+}
+
 // ---- world-select carousel (menu) ----
 function worldLabel(i){
+  if(gameMode==='practice') return 'TRAINING GROUNDS';
   if(gameMode==='challenger') return 'CHALLENGER · WORLD '+(i+1);
   return 'WORLD '+(i+1)+' · '+(i<=unlockedMax ? WORLDS[i].name : '??? LOCKED');
 }
@@ -522,11 +649,25 @@ function worldEmblemURL(i){
     g.drawImage(im, (sz-s)/2, (sz-s)/2+8, s, s); }
   const u=c.toDataURL(); _emblemURL[i]=u; return u;
 }
-function setStageEmblem(i){ const img=$('charimg'); if(img) img.src = worldEmblemURL(clamp(i,0,WORLDS.length-1)); }
+let _trainingEmblemURL=null;
+function trainingEmblemURL(){
+  if(_trainingEmblemURL) return _trainingEmblemURL;
+  const sz=220, c=document.createElement('canvas'); c.width=c.height=sz;
+  const g=c.getContext('2d'), th=TRAINING_WORLD.theme;
+  g.fillStyle=th.tile2; g.fillRect(0,0,sz,sz);
+  g.fillStyle=th.tile1; const T=28;
+  for(let y=0;y<sz;y+=T) for(let x=0;x<sz;x+=T) if(((x/T+y/T)&1)) g.fillRect(x,y,T,T);
+  _trainingEmblemURL=c.toDataURL(); return _trainingEmblemURL;
+}
+function setStageEmblem(i){
+  const img=$('charimg'); if(!img) return;
+  img.src = gameMode==='practice' ? trainingEmblemURL() : worldEmblemURL(clamp(i,0,WORLDS.length-1));
+}
 function refreshWorldSel(){
   $('wname').textContent = worldLabel(selWorld);
-  $('wprev').disabled = selWorld<=0;
-  $('wnext').disabled = selWorld>=(gameMode==='challenger' ? chalUnlocked : unlockedMax);
+  const ws=$('worldsub'); if(ws) ws.textContent = gameMode==='practice' ? 'sandbox · no rewards' : 'the italian invasion';
+  $('wprev').disabled = selWorld<=0 || gameMode==='practice';
+  $('wnext').disabled = gameMode==='practice' || selWorld>=(gameMode==='challenger' ? chalUnlocked : unlockedMax);
   setStageEmblem(selWorld);
 }
 function triggerUnlockReveal(){
@@ -550,6 +691,7 @@ const UPGRADES = [
   // passives
   { id:'dmg',    name:'Brute Force',     icon:'coin',     rarity:'common', cap:5, steps:[{desc:'+25% damage.',          f:()=>P.dmg*=1.25}] },
   { id:'rate',   name:'Adrenaline Rush', icon:'gem',      rarity:'common', cap:5, steps:[{desc:'+18% attack speed.',    f:()=>P.fireRate*=0.82}] },
+  { id:'static', name:'Static Charge',  icon:'gem',      rarity:'common', cap:5, minWorld:1, steps:[{desc:'+10% attack speed.',    f:()=>P.fireRate*=0.90}] },
   { id:'speed',  name:'Fleet Footed',    icon:'heart',    rarity:'common', cap:5, steps:[{desc:'+12% movement speed.',  f:()=>P.speed*=1.12}] },
   { id:'hp',     name:'Vitality Essence',icon:'heart',    rarity:'common', cap:5, steps:[{desc:'+25 max HP, full heal.',f:()=>{P.maxHp+=25;P.hp=P.maxHp;}}] },
   { id:'magnet', name:'Magnetic Pulse',  icon:'gem',      rarity:'common', cap:5, steps:[{desc:'+40% item pickup radius.',f:()=>P.magnet*=1.4}] },
@@ -557,6 +699,7 @@ const UPGRADES = [
   { id:'regen',  name:'Regeneration',    icon:'heart',    rarity:'common', cap:5, steps:[{desc:'recover +1 HP / second.',f:()=>P.regen+=1}] },
   { id:'heavy',  name:'Heavy Rounds',    icon:'coin',     rarity:'common', cap:5, steps:[{desc:'+15% bullet size & +8% projectile speed.',f:()=>{P.bulletR*=1.15;P.bulletSpd*=1.08;}}] },
   { id:'thick',  name:'Thick Skin',      icon:'heart',    rarity:'common', cap:5, steps:[{desc:'+15 max HP.',           f:()=>P.maxHp+=15}] },
+  { id:'luckycharm', name:'Lucky Charm', icon:'coin',     rarity:'common', cap:5, minWorld:0, steps:[{desc:'+5% crit chance (3x dmg).',f:()=>P.crit=Math.min(0.8,P.crit+0.05)}] },
   { id:'crit',   name:'Critical Strike', icon:'coin',     rarity:'uncommon',cap:5,steps:[{desc:'+10% crit chance (3x dmg).',f:()=>P.crit=Math.min(0.8,P.crit+0.10)}] },
   { id:'dashcd', name:'Quick Reflexes',  icon:'tralalero',rarity:'uncommon',cap:5,steps:[{desc:'dash cooldown -20%.',   f:()=>P.dashMax*=0.8}] },
   { id:'critdmg',name:'Killer Instinct', icon:'coin',     rarity:'uncommon',cap:5,steps:[{desc:'+0.5x critical damage.',f:()=>P.critMul+=0.5}] },
@@ -723,6 +866,21 @@ const UPGRADES = [
   { id:'showstopper', name:'Showstopper', icon:'coin', rarity:'epic', cap:1, req:['luckyspin','crit'],
     steps:[{desc:'SYNERGY — JACKPOT hits also critically strike.',f:()=>P.showstopper=true}] },
 
+  { id:'auramonster', name:'Aura Monster', icon:'gembig', rarity:'rare', minWorld:1, cap:3,
+    steps:[
+      {desc:'gain a green damage aura around you.', f:()=>{P.auraR=70; P.auraDmg=8;}},
+      {desc:'aura grows bigger.',                   f:()=>{P.auraR+=30;}},
+      {desc:'aura grows bigger and hits harder.',   f:()=>{P.auraR+=30; P.auraDmg+=10;}},
+    ] },
+  { id:'skibidi', name:'Skibidi Toilet', icon:'gembig', rarity:'epic', minWorld:3,
+    steps:[
+      {desc:'summons toilets that bounce off the map edges 6 times before vanishing, reappearing after 10s.', f:()=>{P.skibidiCount=1; P.skibidiBounces=6;}},
+      {desc:'bounces more before vanishing.',         f:()=>{P.skibidiBounces+=4;}},
+      {desc:'+1 Skibidi Toilet.',                      f:()=>{P.skibidiCount+=1;}},
+      {desc:'+1 Skibidi Toilet.',                      f:()=>{P.skibidiCount+=1;}},
+    ],
+    evo:{name:'Eternal Skibidi', icon:'gembig', desc:'EVOLVE — Skibidi Toilets never disappear.', f:()=>{P.skibidiNeverDie=true;}} },
+
   // ✨ SYNERGY cards — hidden until you own the prerequisite cards (req)
   { id:'frostfire', name:'Frostfire Core', icon:'gem', rarity:'epic', cap:1, req:['slow','nova'],
     steps:[{desc:'SYNERGY — Nova does +120% to frozen foes, who shatter into shards on death.',f:()=>P.frostfire=true}] },
@@ -772,7 +930,8 @@ function nextMove(u){
     return null;
   }
   if(lvl >= (u.cap||5)) return null;
-  return { apply:u.steps[0].f, name:u.name, icon:u.icon, desc:u.steps[0].desc, label:'Lv '+(lvl+1), evolve:false, rare:u.rare };
+  const si = Math.min(lvl, u.steps.length-1);   // supports cards with several distinct non-evolving steps, not just one repeated step
+  return { apply:u.steps[si].f, name:u.name, icon:u.icon, desc:u.steps[si].desc, label:'Lv '+(lvl+1), evolve:false, rare:u.rare };
 }
 
 function resetPlayer(){
@@ -810,16 +969,18 @@ function resetPlayer(){
     charId:(typeof activeCharId!=='undefined'?activeCharId:'gianni'),
     petId:(typeof activePetId!=='undefined'?activePetId:null),
     petX:WORLD.w/2-36, petY:WORLD.h/2, petWalk:0,
-    phaseShifting:false, phaseShiftT:0,
-    waveKills:0, bonusShots:0,
     // Fortunato flags — must be reset so switching away clears them
     luckyBullets:false, noCrit:false, luckyXpOnly:false, luckyBlockDmgMul:1, gearDmgMul:1,
     hasMagnetPet:false,
     bannedCards:null,
     fortunatoLuckyCap:5,
     trueDmg:false,
-    soldierStill:false, soldierBullets:false
+    soldierStill:false, soldierBullets:false,
+    noCards:false, whiteBullets:false, stealthAggro:false, ghostBullets:false,
+    auraR:0, auraDmg:0,
+    skibidiCount:0, skibidiBounces:6, skibidiNeverDie:false
   });
+  skibidiBullets.length=0; skibidiTimers.length=0;
 }
 
 function startGame(idx){
@@ -833,7 +994,7 @@ function startGame(idx){
 }
 function _doStartGame(wi){
   loadWorld(wi);
-  if(gameMode==='challenger'){ WORLD.w=999999; WORLD.h=999999; }   // effectively infinite; ground drawn per-frame
+  if(infiniteMapMode()){ WORLD.w=999999; WORLD.h=999999; }   // effectively infinite; ground drawn per-frame
   initAudio();
   playMusic(curTheme.music);
   resetPlayer();
@@ -862,7 +1023,7 @@ function _doStartGame(wi){
   $('hud').classList.remove('hidden');
   $('zoomctl').classList.remove('hidden');
   if(IS_TOUCH) $('dashbtn').classList.remove('hidden');   // mobile-only on-screen dash
-  if(gameMode==='challenger') startChallengerSpawn(); else startWave();
+  if(timerMode()) startChallengerSpawn(); else startWave();
 }
 
 function startWave(){
@@ -881,11 +1042,11 @@ function startChallengerSpawn(){
   betweenWaves=false;
   waveEnemiesLeft=9999;
   spawnTimer=0;
-  const nextSec=CHAL_BOSS_TIMES[chalBossIdx]||300;
+  const nextSec=nextBossTimeSec();
   const nm=Math.floor(nextSec/60), ns=nextSec%60;
   $('wavetag').textContent='BOSS IN '+(nm>0?nm+':'+(ns<10?'0':'')+ns:ns+'s');
   sfx.wave();
-  bigText('CHALLENGER','#ff5a70');
+  bigText(gameMode==='practice' ? 'TRAINING' : 'CHALLENGER', gameMode==='practice' ? '#4ad0c0' : '#ff5a70');
 }
 
 function chalWorldCleared(e){
@@ -901,7 +1062,7 @@ function chalWorldCleared(e){
   }
   const newChars = typeof CHARACTERS!=='undefined'
     ? CHARACTERS.filter(c=>{
-        if(c.rarity!=='world') return false;
+        if(c.rarity!=='world' && c.rarity!=='challenger') return false;
         const owned = typeof isCharOwned==='function' && isCharOwned(c.id);
         const hadStory  = c.worldUnlock!=null    && c.worldUnlock<=prevChalUnlocked;
         const hadChal   = c.chalWorldUnlock!=null && c.chalWorldUnlock<=prevChalUnlocked;
@@ -912,11 +1073,12 @@ function chalWorldCleared(e){
       })
     : [];
   _clearData={ worldNum:worldIdx+1, coins:worldCoins, gems:gemsEarned, newChars, isChallenger:true };
+  if(newChars.length && typeof updateCharBadge==='function') updateCharBadge();
   state=ST.CUTSCENE;
   cut={ t:0, boss:e, alpha:1, fade:0, name:curWorld().name+' CHALLENGER' };
   e.cut=true; e.deathScale=1;
   enemies.length=0; enemies.push(e);
-  ebullets=[]; bullets=[]; petBullets=[]; zones=[];
+  ebullets=[]; bullets=[]; petBullets=[]; zones=[]; skibidiBullets.length=0; skibidiTimers.length=0;
   hitstop=0.25; shake=Math.max(shake,16);
   stopMusic(); sfx.win();
   bigText('CHALLENGER CLEARED','#ff5a70');
@@ -925,7 +1087,8 @@ function chalWorldCleared(e){
 // lock the field into a small bounded arena around the player; boss arrives after a delay
 function startBossArena(){
   // arena fits inside the world even in thin corridors (clamped to map width/height)
-  const aw = Math.min(ARENA_SIZE, WORLD.w-2*WALL), ah = Math.min(ARENA_SIZE, WORLD.h-2*WALL);
+  const arenaSize = ARENA_SIZE * (gameMode==='challenger' ? CHAL_ARENA_MUL : 1);
+  const aw = Math.min(arenaSize, WORLD.w-2*WALL), ah = Math.min(arenaSize, WORLD.h-2*WALL);
   const cxw = clamp(P.x, WALL+aw/2, WORLD.w-WALL-aw/2);
   const cyw = clamp(P.y, WALL+ah/2, WORLD.h-WALL-ah/2);
   arena = { x:cxw-aw/2, y:cyw-ah/2, w:aw, h:ah };
@@ -935,14 +1098,17 @@ function startBossArena(){
   sfx.warn();
 }
 
+function spawnRingDist(){ return Math.max(W,H)/Math.max(zoom,0.0001)*0.62 + 80; }   // world-space ring radius; scales with viewport so it stays off-screen on wide/zoomed-out monitors
 function ringPos(){ // spawn point on a ring around player, clamped to world
-  const a = rand(0,TAU), d = Math.max(W,H)*0.62 + 80;
+  const a = rand(0,TAU), d = spawnRingDist();
   return { x: clamp(P.x+Math.cos(a)*d, WALL+30, WORLD.w-WALL-30),
            y: clamp(P.y+Math.sin(a)*d, WALL+30, WORLD.h-WALL-30) };
 }
 
 function spawnBoss(){
-  const def = curBosses[(Math.floor(wave/5)-1) % curBosses.length];
+  const def = gameMode==='practice'
+    ? curBosses[Math.floor(Math.random()*curBosses.length)]
+    : curBosses[(Math.floor(wave/5)-1) % curBosses.length];
   const chalMul = gameMode==='challenger' ? 3.5 : 1;
   const mult = (1 + (wave-5)*0.12) * (curWorld().hpMul||1) * (1 + worldBand()*0.42) * chalMul;
   const p = arena ? { x:arena.x+arena.w/2, y:arena.y+arena.h*0.28 } : ringPos();
@@ -1004,7 +1170,7 @@ function spawnBoss(){
 
 // returns false when the global cap is hit (so the caller keeps the wave's spawn budget for later)
 function spawnEnemy(){
-  const eCap = gameMode==='challenger' ? (IS_TOUCH ? 90 : 150) : MAX_ENEMIES;
+  const eCap = timerMode() ? (IS_TOUCH ? 90 : 150) : MAX_ENEMIES;
   if(enemies.length >= eCap) return false;     // global hard cap; challenger allows many more
   const maxIdx = Math.min(curFoes.length-1, Math.floor(wave/2));
   // count live specials so we can keep them few (earthquake + burst shooters especially)
@@ -1109,6 +1275,45 @@ function drawBoomerangCroc(b){
   cx.restore();
 }
 
+function drawKnifeBullet(b){
+  const r=b.r, ang=Math.atan2(b.vy,b.vx);
+  cx.save(); cx.translate(b.x,b.y);
+  cx.globalAlpha=0.45; cx.strokeStyle='#fff6bf'; cx.lineWidth=2.5;
+  cx.beginPath(); cx.arc(0,0,r*1.6,0,TAU); cx.stroke();
+  cx.globalAlpha=1; cx.rotate(ang);
+  // blade, tip leads in direction of travel (outward)
+  cx.fillStyle='#e8eaf0'; cx.strokeStyle='#5a5f6b'; cx.lineWidth=1.6;
+  cx.beginPath(); cx.moveTo(r*2.1,0); cx.lineTo(r*0.5,r*0.5); cx.lineTo(r*0.5,-r*0.5); cx.closePath();
+  cx.fill(); cx.stroke();
+  cx.strokeStyle='#aeb4c0'; cx.lineWidth=1; cx.beginPath(); cx.moveTo(r*1.8,0); cx.lineTo(r*0.6,0); cx.stroke();
+  // crossguard
+  cx.fillStyle='#caa12f'; cx.strokeStyle='#5a4313'; cx.lineWidth=1.4;
+  cx.beginPath(); cx.rect(r*0.3,-r*0.55,r*0.25,r*1.1); cx.fill(); cx.stroke();
+  // hilt
+  cx.fillStyle='#8a5d2c'; cx.beginPath(); cx.rect(-r*0.9,-r*0.22,r*1.0,r*0.44); cx.fill(); cx.stroke();
+  cx.restore();
+}
+
+function drawSkibidiToilet(b){
+  const s=18;
+  cx.save(); cx.translate(b.x,b.y); cx.rotate(b.spin);
+  // friendly halo — distinct icy-blue so it's clearly the player's own bouncing hazard
+  cx.globalAlpha=0.4; cx.strokeStyle='#cfe8ff'; cx.lineWidth=2.5;
+  cx.beginPath(); cx.arc(0,0,s*1.3,0,TAU); cx.stroke(); cx.globalAlpha=1;
+  // tank (back box)
+  cx.fillStyle='#e8eaf0'; cx.strokeStyle='#33272a'; cx.lineWidth=1.8;
+  cx.beginPath(); cx.roundRect(-s*0.55,-s*0.95,s*1.1,s*0.55,3); cx.fill(); cx.stroke();
+  // bowl base
+  cx.beginPath(); cx.roundRect(-s*0.75,-s*0.35,s*1.5,s*0.95,6); cx.fill(); cx.stroke();
+  // seat ring
+  cx.fillStyle='#2a2a2e';
+  cx.beginPath(); cx.ellipse(0,-s*0.05,s*0.55,s*0.32,0,0,TAU); cx.fill();
+  // water
+  cx.fillStyle='#5fc7ff';
+  cx.beginPath(); cx.ellipse(0,-s*0.05,s*0.38,s*0.2,0,0,TAU); cx.fill();
+  cx.restore();
+}
+
 function addZone(x,y,r,o){
   zones.push({ x,y,r, t:0, tele:o.tele||0.6, life:o.life||1.4, dps:o.dps||10, slow:!!o.slow, col:o.col||'#e8a93a', friendly:!!o.friendly });
 }
@@ -1121,7 +1326,8 @@ function gainXp(n){
     P.lv++;
     P.xpNext = Math.floor(4 + P.lv*2.6 + P.lv*P.lv*0.4);
     if(typeof fireHook==='function') fireHook('onLevelUp');
-    openLevelUp();
+    if(P.noCards){ sfx.level(); floatText(P.x,P.y-40,'LEVEL '+P.lv,'#9fe0ff',16); }   // stat-only level up, no card picker
+    else openLevelUp();
   }
   const lb=$('lvbadge'); if(lb) lb.textContent = P.lv;
 }
@@ -1172,9 +1378,9 @@ function openLevelUp(){
     d.className = 'card r-'+tier + (m.evolve ? ' evolve' : '') + (u.req ? ' synergy' : '');
     const ic = SP[m.icon] ? SP[m.icon].toDataURL() : '';
     const owned = P.up[u.id]||0;
-    // 5-star rating row (filled = the level you'd reach by picking it)
+    // 5-star rating row (filled = the level you currently have, before this pick)
     const total = u.evo ? 5 : (u.cap||5);
-    let stars=''; for(let i=0;i<total;i++) stars += `<span class="cstar${i < owned+1 ? ' on' : ''}">★</span>`;
+    let stars=''; for(let i=0;i<total;i++) stars += `<span class="cstar${i < owned ? ' on' : ''}">★</span>`;
     const tag = m.evolve ? 'EVO!' : (owned===0 ? 'New!' : m.label);
     d.innerHTML = `<div class="chead"><span class="cnew">${tag}</span>${m.name}</div>`+
                   `<div class="cmid"><img class="cicon" draggable="false" src="${ic}"><div class="cdesc">${m.desc}</div></div>`+
@@ -1198,7 +1404,7 @@ function gameOver(){
   stopMusic();
   sfx.die();
   shake = 22; hitstop = 0.12;
-  $('fwave').textContent = gameMode==='challenger' ? 'time '+fmtTime(chalElapsed) : 'wave '+wave;
+  $('fwave').textContent = timerMode() ? 'time '+fmtTime(chalElapsed) : 'wave '+wave;
   $('fcoins').textContent = worldCoins;
   $('fkills').textContent = kills;
   $('hud').classList.add('hidden');
@@ -1212,12 +1418,6 @@ function gameOver(){
 function tryDash(){
   if(state!==ST.PLAY || P.dashCd>0) return;
   if(typeof fireHook==='function') fireHook('onDash');
-  if(P.charId==='fantasma'){
-    P.dashCd=P.dashMax; P.phaseShifting=true; P.phaseShiftT=0.8; P.inv=0.8;
-    timeScale=0.3; sfx.dash();
-    if(navigator.vibrate) navigator.vibrate(20);
-    return;
-  }
   let mx=joy.dx, my=joy.dy;
   if(keys['w']||keys['arrowup']) my-=1;
   if(keys['s']||keys['arrowdown']) my+=1;
@@ -1278,10 +1478,10 @@ function separate(e){
 
 function update(dt){
   elapsed += dt;
-  // Challenger mode: advance separate timer (paused during boss), trigger milestones
-  if(gameMode==='challenger' && state===ST.PLAY){
+  // Challenger/practice-timer-based: advance separate timer (paused during boss), trigger milestones
+  if(timerMode() && state===ST.PLAY){
     if(!chalBossActive) chalElapsed += dt;
-    if(!chalBossActive && !boss && chalBossIdx<CHAL_BOSS_TIMES.length && chalElapsed>=CHAL_BOSS_TIMES[chalBossIdx]){
+    if(!chalBossActive && !boss && hasMoreMilestones() && chalElapsed>=nextBossTimeSec()){
       chalBossActive=true;
       wave=(chalBossIdx+1)*5;
       enemies.length=0; luckies=[]; ebullets=[];
@@ -1352,7 +1552,7 @@ function update(dt){
     if(P.knifeCd<=0){ P.knifeCd = P.knifeCdBase;
       const n=P.knifeN||8, off=elapsed*2.2, br=(P.knifeBig?9:6)*(P.bulletR||1), spd=480*(P.bulletSpd||1);
       for(let i=0;i<n;i++){ const a=off+i*TAU/n;
-        bullets.push({x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.knifeEvo?999:(P.pierce+1),hit:new Set(),dist:P.range*0.9,dmgMul:0.7}); }
+        bullets.push({x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:br,pierce:P.knifeEvo?999:(P.pierce+1),hit:new Set(),dist:P.range*0.9,dmgMul:0.7,knife:true}); }
       sfx.shoot();
     }
   }
@@ -1475,6 +1675,47 @@ function update(dt){
       if(e.iv>0 || e.lead) return;
       if(dist2(P.x,P.y,e.x,e.y) < 80*80){ e.hp -= P.burnAura*dt; e.hitT=Math.max(e.hitT,0.05);
         if(Math.random()<0.18) parts.push({x:e.x+rand(-8,8),y:e.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.4,max:0.4,color:'#ff8a3a',r:rand(2,4)}); }
+    });
+  }
+
+  // --- Aura Monster: green damage aura around the player ---
+  if(P.auraR>0){
+    forEnemiesNear(P.x,P.y,P.auraR,(e)=>{
+      if(e.iv>0 || e.lead) return;
+      if(dist2(P.x,P.y,e.x,e.y) < P.auraR*P.auraR){ e.hp -= P.auraDmg*dt; e.hitT=Math.max(e.hitT,0.05);
+        if(Math.random()<0.1) parts.push({x:e.x+rand(-8,8),y:e.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.4,max:0.4,color:'#5fe66a',r:rand(2,4)}); }
+    });
+  }
+
+  // --- Skibidi Toilet: edge-bouncing persistent bullets, own spawn/respawn cycle ---
+  if(P.skibidiCount>0){
+    while(skibidiTimers.length<P.skibidiCount) skibidiTimers.push(0);
+    for(let i=0;i<P.skibidiCount;i++){
+      if(!skibidiBullets[i] || skibidiBullets[i].dead){
+        if(skibidiTimers[i]>0){ skibidiTimers[i]-=dt; continue; }
+        const a=rand(0,TAU), spd=300;
+        skibidiBullets[i]={x:P.x,y:P.y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,bounces:0,spin:0,dead:false};
+      }
+    }
+  }
+  for(let i=0;i<skibidiBullets.length;i++){
+    const b=skibidiBullets[i]; if(!b||b.dead) continue;
+    b.x+=b.vx*dt; b.y+=b.vy*dt; b.spin+=dt*7;
+    let bounced=false;
+    if(b.x<WALL){ b.x=WALL; b.vx=Math.abs(b.vx); bounced=true; }
+    else if(b.x>WORLD.w-WALL){ b.x=WORLD.w-WALL; b.vx=-Math.abs(b.vx); bounced=true; }
+    if(b.y<WALL){ b.y=WALL; b.vy=Math.abs(b.vy); bounced=true; }
+    else if(b.y>WORLD.h-WALL){ b.y=WORLD.h-WALL; b.vy=-Math.abs(b.vy); bounced=true; }
+    if(bounced){
+      b.bounces++; burst(b.x,b.y,'#cfe8ff',6,140); sfx.hit();
+      if(b.bounces>=P.skibidiBounces){
+        if(P.skibidiNeverDie) b.bounces=0;   // evolved: keep bouncing forever instead of dying
+        else { b.dead=true; skibidiTimers[i]=10; continue; }
+      }
+    }
+    forEnemiesNear(b.x,b.y,24,(e)=>{
+      if(e.iv>0 || e.lead) return;
+      if(dist2(b.x,b.y,e.x,e.y) < 24*24){ e.hp -= P.dmg*1.1*dt; e.hitT=Math.max(e.hitT,0.05); }
     });
   }
 
@@ -1690,9 +1931,9 @@ function update(dt){
   }
 
   // --- enemies ---
-  // Challenger: cull enemies that wandered too far — they respawn around the player via normal spawn budget
-  if(gameMode==='challenger' && !chalBossActive){
-    const CULL_DSQ = 1800*1800;
+  // Infinite-map modes: cull enemies that wandered too far — they respawn around the player via normal spawn budget
+  if(infiniteMapMode() && !chalBossActive){
+    const cullD = spawnRingDist()+400, CULL_DSQ = cullD*cullD;   // must stay well beyond the spawn ring or wide/zoomed-out screens cull enemies the instant they spawn
     for(let i=enemies.length-1;i>=0;i--){
       const e=enemies[i];
       if(e && !e.isBoss && dist2(e.x,e.y,P.x,P.y)>CULL_DSQ) enemies.splice(i,1);
@@ -1744,26 +1985,39 @@ function update(dt){
         else if(e.dst==='dash'){ e.ddur-=dt; dashing=true; e.x+=Math.cos(e.da)*460*dt; e.y+=Math.sin(e.da)*460*dt; if(e.ddur<=0){ e.dst='idle'; e.dcd=rand(2.6,4.6); } }
         else { e.dcd-=dt; if(e.dcd<=0 && e.iv<=0 && dist2(e.x,e.y,P.x,P.y)<380*380){ e.dst='wind'; e.dwin=0.5; e.da=Math.atan2(P.y-e.y,P.x-e.x); dashing=true; } }
       }
+      // Fantasma's stealth: enemies stay put (and hold fire) unless he's close or they've been shot recently
+      let awake=true;
+      if(P.stealthAggro && !e.isBoss){
+        e.aggroT=Math.max(0,(e.aggroT||0)-dt);
+        awake = e.aggroT>0 || dist2(e.x,e.y,P.x,P.y) <= STEALTH_RADIUS*STEALTH_RADIUS;
+      }
       if(!dashing && e.iv<=0){
         const fs = e.frz>0 ? 0.2 : (e.chillT>0 ? 0.55 : 1);     // frozen (0.2x) / Permafrost chill (0.55x)
-        const toP = Math.atan2(P.y-e.y, P.x-e.x);
-        const d2  = dist2(e.x,e.y,P.x,P.y);
-        const rng = e.range||0;           // 0 = melee: always chase
-        let a = toP + Math.sin(e.t*e.wob)*0.4;
-        let move = true;
-        if(rng>0){
-          if(d2 > rng*rng){ /* out of range: approach (move already true) */ }
-          else if(d2 < (rng*0.55)*(rng*0.55)){ move=true; a = toP+Math.PI + Math.sin(e.t*e.wob)*0.4; } // too close: back off
-          else if(e.shoot && e.shoot.move){ a = toP + Math.PI/2; } // in range + mobile: strafe
-          else { move=false; }                                  // in range + stationary: hold
+        if(awake){
+          const toP = Math.atan2(P.y-e.y, P.x-e.x);
+          const d2  = dist2(e.x,e.y,P.x,P.y);
+          const rng = e.range||0;           // 0 = melee: always chase
+          let a = toP + Math.sin(e.t*e.wob)*0.4;
+          let move = true;
+          if(rng>0){
+            if(d2 > rng*rng){ /* out of range: approach (move already true) */ }
+            else if(d2 < (rng*0.55)*(rng*0.55)){ move=true; a = toP+Math.PI + Math.sin(e.t*e.wob)*0.4; } // too close: back off
+            else if(e.shoot && e.shoot.move){ a = toP + Math.PI/2; } // in range + mobile: strafe
+            else { move=false; }                                  // in range + stationary: hold
+          }
+          if(move){ e.x += Math.cos(a)*e.sp*fs*dt; e.y += Math.sin(a)*e.sp*fs*dt; }
+          e.face = Math.cos(toP)>=0 ? 1 : -1;
+        } else {
+          // asleep to Fantasma: slow drifting wander instead of chasing
+          const wa = e.t*0.6 + e.wob*7;
+          e.x += Math.cos(wa)*e.sp*0.3*fs*dt; e.y += Math.sin(wa)*e.sp*0.3*fs*dt;
+          e.face = Math.cos(wa)>=0 ? 1 : -1;
         }
-        if(move){ e.x += Math.cos(a)*e.sp*fs*dt; e.y += Math.sin(a)*e.sp*fs*dt; }
-        e.face = Math.cos(toP)>=0 ? 1 : -1;
       }
       separate(e);   // resolve overlaps with nearby foes so the pack spreads + flows around
       e.x = clamp(e.x, WALL, WORLD.w-WALL); e.y = clamp(e.y, WALL, WORLD.h-WALL);
       if(arena){ e.x=clamp(e.x, arena.x+e.r, arena.x+arena.w-e.r); e.y=clamp(e.y, arena.y+e.r, arena.y+arena.h-e.r); }
-      if(wave>=3 && e.iv<=0){
+      if(wave>=3 && e.iv<=0 && awake){
         if(e.shoot && (!e.range || dist2(e.x,e.y,P.x,P.y) <= e.range*e.range)){
           e.shootCd -= dt;
           if(e.shootCd<=0){
@@ -1842,15 +2096,15 @@ function update(dt){
           bullets.push({x:e.x,y:e.y,vx:Math.cos(a)*420,vy:Math.sin(a)*420,r:6,pierce:1,hit:new Set(),dist:300,dmgMul:0.5}); }
         burst(e.x,e.y,'#bfe6ff',8,180);
       }
-      if(e.isBoss && gameMode==='challenger'){
-        // Challenger boss kill
+      if(e.isBoss && timerMode()){
+        // Challenger/practice-timer-based boss kill
         boss=null; arena=null;
         $('bossbar').classList.add('hidden');
         ebullets=[];
         enemies=enemies.filter(o=>o.isBoss);
         zones=[];
-        if(chalBossIdx>=CHAL_BOSS_TIMES.length-1){
-          chalWorldCleared(e);   // final challenger boss → world clear
+        if(gameMode==='challenger' && chalBossIdx>=CHAL_BOSS_TIMES.length-1){
+          chalWorldCleared(e);   // final challenger boss → world clear (practice never reaches this — hasMoreMilestones() is always true)
         } else {
           chalBossIdx++;
           chalBossActive=false;
@@ -1895,10 +2149,10 @@ function update(dt){
 
   // advance after the cleared-gap. In-update countdown (NOT a wall-clock setTimeout) so it
   // pauses with the game and can never be dropped by a pause/blur firing during the gap.
-  if(betweenWaves && waveGapT>0 && gameMode!=='challenger'){ waveGapT-=dt; if(waveGapT<=0){ waveGapT=0; wave++; startWave(); } }
+  if(betweenWaves && waveGapT>0 && !timerMode()){ waveGapT-=dt; if(waveGapT<=0){ waveGapT=0; wave++; startWave(); } }
 
-  // wave cleared? (not while the boss is still incoming; skip in challenger — enemies spawn endlessly)
-  if(!betweenWaves && bossPending<=0 && waveEnemiesLeft===0 && enemies.length===0 && gameMode!=='challenger'){
+  // wave cleared? (not while the boss is still incoming; skip in timer-mode — enemies spawn endlessly)
+  if(!betweenWaves && bossPending<=0 && waveEnemiesLeft===0 && enemies.length===0 && !timerMode()){
     betweenWaves=true; waveGapT=2.2;
     bigText('WAVE CLEARED','#5fbf52');
     if(typeof fireHook==='function') fireHook('waveEnd');
@@ -1924,8 +2178,8 @@ function update(dt){
   }
 
   // --- lucky blocks ---
-  if(gameMode==='challenger' && !chalBossActive && state===ST.PLAY){
-    // Challenger: periodic lucky block spawns around the player; Fortunato gets double cap
+  if(infiniteMapMode() && !chalBossActive && state===ST.PLAY){
+    // Infinite-map modes: periodic lucky block spawns around the player; Fortunato gets double cap
     chalLuckyT -= dt;
     const chalLuckyCap = P.luckyXpOnly ? 6 : 3;
     if(chalLuckyT<=0){
@@ -1978,7 +2232,7 @@ function update(dt){
     if(d < (P.r+12)*(P.r+12)){
       gems.splice(i,1);
       if(g.heart){ const h=g.heal||(g.big?50:25); P.hp=Math.min(P.maxHp,P.hp+h); floatText(P.x,P.y-24,'+'+h,'#e8556a',g.big?20:16); burst(P.x,P.y,'#ff97a6',g.big?14:8,140); sfx.coin(); }
-      else if(g.coin){ const v=Math.round(5*(P.goldMul||1)*coinMult()*worldCoinMul()*(gameMode==='challenger'?Math.min(3.5,1.3+worldIdx*0.3):1)); gold+=v; worldCoins+=v; saveGold(); if(window.markDirty) window.markDirty(); setCoinHUD(); floatText(g.x,g.y,'+'+v,'#f5c542',13); sfx.coin(); }
+      else if(g.coin){ const v=Math.round(5*(P.goldMul||1)*coinMult()*worldCoinMul()*(gameMode==='challenger'?Math.min(3.5,1.3+worldIdx*0.3):1)); worldCoins+=v; if(gameMode!=='practice'){ gold+=v; saveGold(); if(window.markDirty) window.markDirty(); } setCoinHUD(); floatText(g.x,g.y,'+'+v,'#f5c542',13); sfx.coin(); }
       else if(g.magnet){ for(const o of gems) o.vac=true; floatText(P.x,P.y-24,'MAGNET','#9fe0ff',16); burst(P.x,P.y,'#9fe0ff',12,160); sfx.level(); }   // pull in every pickup on the map
       else { gainXp(g.v); sfx.gem(2); }
     }
@@ -2028,15 +2282,15 @@ function update(dt){
   if(hitFlash>0) hitFlash -= dt*3;
 
   $('xpfill').style.width = (P.xp/P.xpNext)*100+'%';
-  { const displayTime=gameMode==='challenger'?chalElapsed:elapsed;
+  { const displayTime=timerMode()?chalElapsed:elapsed;
     const sec=Math.floor(displayTime);
     if(sec!==_lastSec){ _lastSec=sec;
       const tt=$('timetag'); if(tt) tt.textContent=fmtTime(displayTime);
-      if(gameMode==='challenger' && !chalBossActive && chalBossIdx<CHAL_BOSS_TIMES.length){
-        const rem=Math.max(0, Math.ceil(CHAL_BOSS_TIMES[chalBossIdx]-chalElapsed));
+      if(timerMode() && !chalBossActive && hasMoreMilestones()){
+        const rem=Math.max(0, Math.ceil(nextBossTimeSec()-chalElapsed));
         const rm=Math.floor(rem/60), rs=rem%60;
         const wt=$('wavetag'); if(wt) wt.textContent='BOSS IN '+(rm>0?rm+':'+(rs<10?'0':'')+rs:rs+'s');
-      } else if(gameMode==='challenger' && chalBossActive){
+      } else if(timerMode() && chalBossActive){
         const wt=$('wavetag'); if(wt) wt.textContent='BOSS FIGHT';
       }
     }
@@ -2078,12 +2332,15 @@ function damageEnemy(e,dmg,fx,fy,crit){
     floatText(e.x,e.y-e.r-20,'JACKPOT!','#ffd24a',16);
   }
   e.hp -= dmg; e.hitT=0.12; e.sq=1;
+  if(P.stealthAggro && !e.isBoss) e.aggroT=Math.max(e.aggroT||0,3);   // getting shot wakes the enemy up
   if(P.freeze && !e.isBoss) e.frz=1.2;
   if(P.chillHit && !e.isBoss && e.frz<=0) e.chillT = Math.max(e.chillT||0, 0.8 + 0.25*P.chillHit);   // Permafrost: chill-on-hit
   sfx.hit();
   const _dvx=(Math.random()-0.5)*120;
-  texts.push({x:e.x,y:e.y-e.r-4,str:(crit?'':'')+Math.round(dmg),color:crit?'#ffd23a':'#fff',size:crit?18:13,life:0.9,max:0.9,vy:-55,vx:_dvx});
-  if(crit) texts.push({x:e.x,y:e.y-e.r-20,str:'CRIT',color:'#ffd23a',size:15,life:0.9,max:0.9,vy:-55,vx:_dvx});
+  // spread simultaneous hits (piercing/multishot) apart from spawn so they don't stack into illegible overlap
+  const _jx=rand(-14,14), _jy=rand(-6,6);
+  texts.push({x:e.x+_jx,y:e.y-e.r-4+_jy,str:(crit?'':'')+Math.round(dmg),color:crit?'#ffd23a':'#fff',size:crit?18:13,life:0.9,max:0.9,vy:-55,vx:_dvx});
+  if(crit) texts.push({x:e.x+_jx,y:e.y-e.r-40+_jy,str:'CRIT',color:'#ffd23a',size:15,life:0.9,max:0.9,vy:-55,vx:_dvx});
 }
 
 function fireEB(x,y,a,sp,color,opts){
@@ -2675,7 +2932,8 @@ function startFinalCharge(e){
 function expandFinalArena(e){
   if(!arena) return;
   const cx0=arena.x+arena.w/2, cy0=arena.y+arena.h/2;
-  const naw=Math.min(arena.w*1.5, WORLD.w-2*WALL), nah=Math.min(arena.h*1.5, WORLD.h-2*WALL);
+  const grow = gameMode==='challenger' ? CHAL_FINAL_ARENA_GROW : FINAL_ARENA_GROW;
+  const naw=Math.min(arena.w*grow, WORLD.w-2*WALL), nah=Math.min(arena.h*grow, WORLD.h-2*WALL);
   const ncx=clamp(cx0,WALL+naw/2,WORLD.w-WALL-naw/2), ncy=clamp(cy0,WALL+nah/2,WORLD.h-WALL-nah/2);
   arena={x:ncx-naw/2,y:ncy-nah/2,w:naw,h:nah};
 }
@@ -3028,7 +3286,7 @@ function drawSprite(name, x, y, size, rot, sq, hitT, flip, tint){
   const dsz = img._nom ? size * img.width / img._nom : size;
   const drawImg = (tint && tintedSprite(name,tint)) || img;
   cx.drawImage(drawImg, -dsz/2, -dsz/2, dsz, dsz);
-  if(hitT>0){ cx.globalAlpha=Math.min(1,hitT/0.12); cx.drawImage(SPW[name], -dsz/2, -dsz/2, dsz, dsz); cx.globalAlpha=1; }
+  if(hitT>0.012){ cx.globalAlpha=Math.min(1,hitT/0.12); cx.drawImage(SPW[name], -dsz/2, -dsz/2, dsz, dsz); cx.globalAlpha=1; }   // skip the imperceptible tail of the flash to save a full extra drawImage
   cx.restore();
 }
 
@@ -3064,6 +3322,8 @@ function drawDebris(g,gx0,gy0,gx1,gy1){
 // Pre-render the whole-world ground (tiles + tufts + debris) to one offscreen canvas, ONCE per theme.
 // Per frame the renderer just blits this instead of re-looping every tile — a big win in DIRT DEPTHS.
 let groundCanvas=null, groundFor=null;
+let infiniteGroundCanvas=null, infiniteGroundFor=null;
+const INFINITE_GROUND_SPAN = TILE * 12;   // 960px: repeats checker + tuft offset cleanly
 function buildGround(){
   if(!groundCanvas){ groundCanvas=document.createElement('canvas'); }
   groundCanvas.width=WORLD.w; groundCanvas.height=WORLD.h;
@@ -3085,6 +3345,36 @@ function buildGround(){
   if(curTheme.debris) drawDebris(g, 0,0, WORLD.w, WORLD.h);
   groundFor=curTheme;
 }
+function buildInfiniteGround(){
+  if(!infiniteGroundCanvas){ infiniteGroundCanvas=document.createElement('canvas'); }
+  const span = INFINITE_GROUND_SPAN;
+  infiniteGroundCanvas.width=span; infiniteGroundCanvas.height=span;
+  const g=infiniteGroundCanvas.getContext('2d');
+  for(let gy=0; gy<span; gy+=TILE){
+    for(let gx=0; gx<span; gx+=TILE){
+      g.fillStyle=((((gx/TILE)|0)+((gy/TILE)|0))&1)?curTheme.tile1:curTheme.tile2;
+      g.fillRect(gx,gy,TILE,TILE);
+    }
+  }
+  g.fillStyle=curTheme.tuft;
+  for(let gy=0; gy<span; gy+=TILE){
+    for(let gx=0; gx<span; gx+=TILE){
+      const h=((gx*31+gy*17)%97)/97;
+      if(h<0.3){ g.fillRect((gx+((gx>>>3)%60))+10,(gy+((gy>>>2)%60))+12,3,7); }
+    }
+  }
+  infiniteGroundFor=curTheme;
+}
+function renderInfiniteGround(vx0,vy0,vx1,vy1){
+  if(!infiniteGroundCanvas || infiniteGroundFor!==curTheme) buildInfiniteGround();
+  const span = INFINITE_GROUND_SPAN;
+  const gx0=Math.floor(vx0/span)*span, gy0=Math.floor(vy0/span)*span;
+  for(let gy=gy0; gy<=vy1; gy+=span){
+    for(let gx=gx0; gx<=vx1; gx+=span){
+      cx.drawImage(infiniteGroundCanvas, gx, gy);
+    }
+  }
+}
 
 function render(){
   cx.save();
@@ -3099,22 +3389,8 @@ function render(){
   // --- ground ---
   cx.fillStyle=curTheme.void;
   cx.fillRect(vx0-40, vy0-40, vw+80, vh+80);
-  if(gameMode==='challenger'){
-    // Infinite tiling ground — draw only visible tiles per-frame (no canvas limit)
-    const gx0=Math.floor(vx0/TILE)*TILE, gy0=Math.floor(vy0/TILE)*TILE;
-    for(let gy=gy0; gy<=vy1+TILE; gy+=TILE){
-      for(let gx=gx0; gx<=vx1+TILE; gx+=TILE){
-        cx.fillStyle=((((gx/TILE)|0)+((gy/TILE)|0))&1)?curTheme.tile1:curTheme.tile2;
-        cx.fillRect(gx,gy,TILE,TILE);
-      }
-    }
-    cx.fillStyle=curTheme.tuft;
-    for(let gy=gy0; gy<=vy1+TILE; gy+=TILE){
-      for(let gx=gx0; gx<=vx1+TILE; gx+=TILE){
-        const h=((gx*31+gy*17)%97)/97;
-        if(h<0.3){ cx.fillRect((gx+((gx>>>3)%60))+10,(gy+((gy>>>2)%60))+12,3,7); }
-      }
-    }
+  if(infiniteMapMode()){
+    renderInfiniteGround(vx0-40, vy0-40, vx1+40, vy1+40);
   } else {
     if(!groundCanvas || groundFor!==curTheme) buildGround();
     const sx0=clamp(vx0-2,0,WORLD.w), sy0=clamp(vy0-2,0,WORLD.h);
@@ -3167,11 +3443,13 @@ function render(){
   }
 
   // --- player bullets: bright gold with a white halo = YOURS ---
-  const bcore = P.railgun ? '#5fe6ff' : P.soldierBullets ? '#1a1a22' : '#ffd21f';
-  const bhi   = P.railgun ? '#dafcff' : P.soldierBullets ? '#44444e' : '#fff6bf';
+  const bcore = P.railgun ? '#5fe6ff' : P.soldierBullets ? '#1a1a22' : P.whiteBullets ? '#ffffff' : '#ffd21f';
+  const bhi   = P.railgun ? '#dafcff' : P.soldierBullets ? '#44444e' : P.whiteBullets ? '#bcdcff' : '#fff6bf';
+  if(P.ghostBullets) cx.globalAlpha=0.6;   // Fantasma: slightly translucent shots
   for(const b of bullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     if(b.boom){ drawBoomerangCroc(b); continue; }
+    if(b.knife){ drawKnifeBullet(b); continue; }
     if(b.lucky){
       if(b.luckyCrit){ cx.filter='grayscale(1) contrast(1.1)'; drawSprite('luckyblock',b.x,b.y,b.r*7,0,0,0,false,null); cx.filter='none'; }
       else drawSprite('luckyblock',b.x,b.y,b.r*5,0,0,0,false,null);
@@ -3181,12 +3459,20 @@ function render(){
     cx.fillStyle=bcore; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
     cx.fillStyle=bhi; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.4,0,TAU); cx.fill();
   }
+  if(P.ghostBullets) cx.globalAlpha=1;
 
   // --- pet bullets: small cyan dot ---
   for(const pb of petBullets){
     if(pb.x<vx0-20||pb.x>vx1+20||pb.y<vy0-20||pb.y>vy1+20) continue;
     cx.fillStyle='#fff'; cx.beginPath(); cx.arc(pb.x,pb.y,6,0,TAU); cx.fill();
     cx.fillStyle='#6be8ff'; cx.beginPath(); cx.arc(pb.x,pb.y,4,0,TAU); cx.fill();
+  }
+
+  // --- Skibidi Toilet bullets: spinning toilets bouncing off the map edges ---
+  for(const b of skibidiBullets){
+    if(!b || b.dead) continue;
+    if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
+    drawSkibidiToilet(b);
   }
 
   // --- orbs ---
@@ -3203,6 +3489,9 @@ function render(){
   _vis.length=0;   // reuse a scratch array instead of allocating filter()+sort() every frame
   for(const e of enemies){ if(e.x>vx0-60&&e.x<vx1+60&&e.y>vy0-60&&e.y<vy1+60) _vis.push(e); }
   _vis.sort((a,b)=>a.y-b.y);
+  // idle sprite wobble forces every drawImage onto canvas's slower rotated-blit path (any non-zero
+  // rotation does); skip it once there are enough visible enemies that the blit cost actually matters
+  const skipWob = _vis.length > 40;
   for(const e of _vis){
     if(e.under){   // burrowed: just a heaving dirt mound that tracks the player
         const w=e.r*1.1+Math.sin(e.t*10)*3;
@@ -3234,7 +3523,7 @@ function render(){
       cx.globalAlpha=0.7; cx.lineWidth=3.5; cx.beginPath(); cx.arc(e.x,e.y,e.r+8+(1-k)*48,0,TAU); cx.stroke();   // shrinks in as the attack nears
       cx.globalAlpha=1;
     }
-    const wob = e.isBoss ? Math.sin(e.t*2)*0.06 : Math.sin(e.t*6)*0.12;
+    const wob = skipWob ? 0 : (e.isBoss ? Math.sin(e.t*2)*0.06 : Math.sin(e.t*6)*0.12);
     if(e.cut && cut){ cx.globalAlpha = cut.alpha; }
     drawSprite(e.spr, e.x, e.y, e.r*2.5*(e.deathScale||1), wob, e.sq, e.hitT, e.face===-1, e.isBoss?null:curWorld().enemyTint);   // per-world enemy recolor
     if(e.cut){ cx.globalAlpha = 1; }
@@ -3249,7 +3538,11 @@ function render(){
       cx.fillRect(e.x-w/2,e.y-e.r-12,w*Math.max(0,e.hp/e.maxHp),5);
     }
     if(e.isBoss){
-      cx.font='900 13px sans-serif'; cx.fillStyle='#fff'; cx.textAlign='center';
+      cx.font='900 13px sans-serif'; cx.textAlign='center';
+      const nameW=cx.measureText(e.name).width;
+      cx.fillStyle='rgba(20,14,8,0.55)';
+      cx.fillRect(e.x-nameW/2-6, e.y-e.r-34, nameW+12, 18);
+      cx.fillStyle='#fff';
       cx.strokeStyle=OUT; cx.lineWidth=3; cx.strokeText(e.name, e.x, e.y-e.r-22); cx.fillText(e.name, e.x, e.y-e.r-22);
     }
   }
@@ -3308,16 +3601,23 @@ function render(){
     if(!blink){
       const bob=Math.sin(P.walk)*0.06;
       const flip = Math.cos(P.face)<0;
-      if(P.phaseShifting) cx.globalAlpha=0.35;
       if(typeof drawCharacter==='function') drawCharacter(P.charId||'gianni', P.x, P.y, P.r*2.6, bob, flip);
       else drawSprite('player', P.x, P.y, P.r*2.6, bob, 0, 0, flip);
       cx.globalAlpha=1;
-      if(typeof drawPlayerGear==='function') drawPlayerGear(P.x, P.y, P.r*2.6, bob, flip);   // equipped gear overlay
+      if(typeof drawPlayerGear==='function' && gearShouldShow(P.charId)) drawPlayerGear(P.x, P.y, P.r*2.6, bob, flip);   // equipped gear overlay (hidden by default on non-default characters)
     }
     // Phoenix burn aura
     if(P.burnAura>0){
       cx.globalAlpha=0.12+0.05*Math.sin(elapsed*8); cx.fillStyle='#ff7a3a';
       cx.beginPath(); cx.arc(P.x,P.y,80,0,TAU); cx.fill(); cx.globalAlpha=1;
+    }
+    // Aura Monster: clearly-green damage aura, fill + bright ring so it always reads as "yours"
+    if(P.auraR>0){
+      cx.globalAlpha=0.16+0.05*Math.sin(elapsed*6); cx.fillStyle='#39d953';
+      cx.beginPath(); cx.arc(P.x,P.y,P.auraR,0,TAU); cx.fill();
+      cx.globalAlpha=0.55; cx.strokeStyle='#2ecc40'; cx.lineWidth=2.5;
+      cx.beginPath(); cx.arc(P.x,P.y,P.auraR,0,TAU); cx.stroke();
+      cx.globalAlpha=1;
     }
     // Soldier stand-still boost indicator — pulsing red ring
     if(P.soldierBullets && P.soldierStill){
@@ -3484,7 +3784,9 @@ function renderZones(){
   cx.globalAlpha=1;
 }
 
-function shouldShowMinimap(){ return state!==ST.MENU && state!==ST.OVER && !IS_TOUCH; }
+function shouldShowMinimap(){
+  return !!MMH && state!==ST.MENU && state!==ST.OVER && !IS_TOUCH && (gameMode==='challenger' || !infiniteMapMode());
+}
 function minimapSize(){ return Math.round(clamp(Math.min(W,H)*0.2, 150, 240)); }
 function minimapGeom(){
   const ms = minimapSize(), pad = 18;
@@ -3655,11 +3957,11 @@ function loop(t){
   tPrev = t;
   if(hitstop>0){ hitstop-=dt; dt=0; }
   if(state===ST.PLAY){
-    if(P.phaseShifting){ P.phaseShiftT-=dt; if(P.phaseShiftT<=0){ P.phaseShifting=false; timeScale=1.0; } }
     update(dt*timeScale);
   } else if(state===ST.MENU) menuUpdate(dt);
   else if(state===ST.CUTSCENE) cutsceneUpdate(dt);
-  render();
+  else if(state===ST.INTRO) introUpdate(dt);
+  if(state===ST.INTRO) introRender(); else render();
 }
 
 // menu: gentle drifting enemies around the player anchor for vibes
@@ -3776,9 +4078,16 @@ setInterval(()=>{
 requestAnimationFrame(loop);
 
 $('startbtn').addEventListener('click', ()=>{
+  if(gameMode==='practice'){ openPracticeSetup(); return; }
   const m=$('menu'); m.classList.add('leaving');
-  setTimeout(()=>{ m.classList.remove('leaving'); startGame(selWorld); }, 190);
+  const wantsIntro = gameMode==='story' && selWorld===0 && !localStorage.getItem('br_seen_intro');
+  setTimeout(()=>{
+    m.classList.remove('leaving');
+    if(wantsIntro) startIntro(()=>startGame(0));
+    else startGame(selWorld);
+  }, 190);
 });
+$('introskip').addEventListener('click', finishIntro);
 
 // ===== GAMEMODE POPUP =====
 (function(){
@@ -3811,6 +4120,136 @@ $('startbtn').addEventListener('click', ()=>{
     refreshWorldSel();
     closePop(); sfx.pick();
   });
+  const practiceBtn=$('gm-practice');
+  if(practiceBtn) practiceBtn.addEventListener('click', ()=>{
+    closePop(); sfx.pick();
+    const cp=$('practice-confirm-popup'); if(cp) cp.classList.remove('hidden');
+  });
+})();
+
+// ===== PRACTICE MODE: confirm popup + customize popup + enemy/boss pickers =====
+(function(){
+  const confirmPop=$('practice-confirm-popup');
+  function closeConfirm(){ if(confirmPop) confirmPop.classList.add('hidden'); }
+  const okBtn=$('practice-confirm-ok');
+  if(okBtn) okBtn.addEventListener('click', ()=>{
+    gameMode='practice'; refreshWorldSel(); closeConfirm(); sfx.pick();
+  });
+  const cancelBtn=$('practice-confirm-cancel');
+  if(cancelBtn) cancelBtn.addEventListener('click', closeConfirm);
+  if(confirmPop) confirmPop.addEventListener('click', e=>{ if(e.target===confirmPop) closeConfirm(); });
+
+  // ---- foe/boss table grouping: many WORLDS entries share the same table reference
+  // (e.g. FOES_DIRT is reused by 5 worlds) — group by reference so each enemy/boss shows once. ----
+  function groupedTables(key){   // key: 'foes' or 'bosses'
+    const groups=[]; const byRef=new Map();
+    for(let i=0;i<=unlockedMax && i<WORLDS.length;i++){
+      const w=WORLDS[i], table=w[key];
+      if(byRef.has(table)) byRef.get(table).names.push(w.name);
+      else { const g={names:[w.name], list:table}; byRef.set(table,g); groups.push(g); }
+    }
+    return groups;
+  }
+
+  function setupPracticeDefaults(){
+    // nothing selected by default — the player opts in explicitly (confirm requires >=1 of each)
+    if(!practiceCfg._foeSet)  practiceCfg._foeSet = new Set();
+    if(!practiceCfg._bossSet) practiceCfg._bossSet = new Set();
+  }
+
+  function buildPickList(listEl, key, set){
+    let html='';
+    for(const g of groupedTables(key)){
+      html += '<div class="banner"><span>'+g.names.join(' / ')+'</span></div>';
+      for(let idx=0; idx<g.list.length; idx++){
+        const def=g.list[idx], on=set.has(def);
+        const ic = SP[def.spr] ? SP[def.spr].toDataURL() : '';
+        html += '<div class="pickrow'+(on?' on':'')+'" data-gi="'+(listEl._groups.push(g)-1)+'" data-idx="'+idx+'">'+
+          (ic?'<img src="'+ic+'" alt="">':'')+'<span class="pickname">'+def.name+'</span><span class="pickmark">'+(on?'✓':'')+'</span></div>';
+      }
+    }
+    listEl.innerHTML=html;
+  }
+
+  // delegated click handler shared by both picker lists: toggle membership in the live Set
+  function wirePickList(listEl, getSet){
+    listEl.addEventListener('click', e=>{
+      const row=e.target.closest('.pickrow'); if(!row) return;
+      const g=listEl._groups[+row.dataset.gi], def=g.list[+row.dataset.idx], set=getSet();
+      if(set.has(def)) set.delete(def); else set.add(def);
+      row.classList.toggle('on'); row.querySelector('.pickmark').textContent=set.has(def)?'✓':'';
+      sfx.pick();
+    });
+  }
+
+  const enemyPop=$('practice-enemy-popup'), enemyList=$('pcfg-enemy-list');
+  const bossPop=$('practice-boss-popup'),   bossList=$('pcfg-boss-list');
+  const enemyCountEl=$('pcfg-enemy-count'), bossCountEl=$('pcfg-boss-count');
+  enemyList._groups=[]; bossList._groups=[];
+  wirePickList(enemyList, ()=>practiceCfg._foeSet);
+  wirePickList(bossList,  ()=>practiceCfg._bossSet);
+
+  function openEnemyPicker(){
+    setupPracticeDefaults();
+    enemyList._groups=[];
+    buildPickList(enemyList, 'foes', practiceCfg._foeSet);
+    enemyPop.classList.remove('hidden');
+  }
+  function openBossPicker(){
+    setupPracticeDefaults();
+    bossList._groups=[];
+    buildPickList(bossList, 'bosses', practiceCfg._bossSet);
+    bossPop.classList.remove('hidden');
+  }
+
+  const ecBtn=$('pcfg-enemies-btn'); if(ecBtn) ecBtn.addEventListener('click', openEnemyPicker);
+  const bcBtn=$('pcfg-bosses-btn');  if(bcBtn) bcBtn.addEventListener('click', openBossPicker);
+  function closeEnemyPicker(){ enemyPop.classList.add('hidden'); if(enemyCountEl) enemyCountEl.textContent=practiceCfg._foeSet.size; }
+  function closeBossPicker(){ bossPop.classList.add('hidden'); if(bossCountEl) bossCountEl.textContent=practiceCfg._bossSet.size; }
+  const ecClose=$('pcfg-enemy-close'); if(ecClose) ecClose.addEventListener('click', closeEnemyPicker);
+  const ecDone=$('pcfg-enemy-done');   if(ecDone) ecDone.addEventListener('click', closeEnemyPicker);
+  const bcClose=$('pcfg-boss-close');  if(bcClose) bcClose.addEventListener('click', closeBossPicker);
+  const bcDone=$('pcfg-boss-done');    if(bcDone) bcDone.addEventListener('click', closeBossPicker);
+  enemyPop.addEventListener('click', e=>{ if(e.target===enemyPop) closeEnemyPicker(); });
+  bossPop.addEventListener('click', e=>{ if(e.target===bossPop) closeBossPicker(); });
+
+  // ---- toggles ----
+  function wireToggle(id, label, getVal, setVal){
+    const btn=$(id); if(!btn) return;
+    function refresh(){ const v=getVal(); btn.textContent=label+': '+(v?'On':'Off'); btn.classList.toggle('off', !v); }
+    btn.addEventListener('click', ()=>{ setVal(!getVal()); refresh(); sfx.pick(); onChange(); });
+    refresh();
+  }
+  const mapNote=$('pcfg-mapnote');
+  function onChange(){ if(mapNote) mapNote.textContent = practiceCfg.infiniteMap ? 'Infinite map disables the minimap.' : ''; }
+  wireToggle('pcfg-infwaves','Infinite Waves', ()=>practiceCfg.infiniteWaves, v=>practiceCfg.infiniteWaves=v);
+  wireToggle('pcfg-timer','Timer-Based', ()=>practiceCfg.timerBased, v=>practiceCfg.timerBased=v);
+  wireToggle('pcfg-infmap','Infinite Map', ()=>practiceCfg.infiniteMap, v=>practiceCfg.infiniteMap=v);
+  onChange();
+
+  const setupPop=$('practice-setup-popup');
+  window.openPracticeSetup = function(){
+    setupPracticeDefaults();
+    if(enemyCountEl) enemyCountEl.textContent=practiceCfg._foeSet.size;
+    if(bossCountEl) bossCountEl.textContent=practiceCfg._bossSet.size;
+    setupPop.classList.remove('hidden');
+  };
+  function closeSetup(){ setupPop.classList.add('hidden'); }
+  const setupClose=$('practice-setup-close'); if(setupClose) setupClose.addEventListener('click', closeSetup);
+  setupPop.addEventListener('click', e=>{ if(e.target===setupPop) closeSetup(); });
+
+  const confirmBtn=$('pcfg-confirm');
+  if(confirmBtn) confirmBtn.addEventListener('click', ()=>{
+    if(practiceCfg._foeSet.size===0 || practiceCfg._bossSet.size===0){ shake=Math.max(shake,6); sfx.pick(); return; }
+    practiceCfg.foes=[...practiceCfg._foeSet];
+    practiceCfg.bosses=[...practiceCfg._bossSet];
+    TRAINING_WORLD.foes=practiceCfg.foes;
+    TRAINING_WORLD.bosses=practiceCfg.bosses;
+    TRAINING_WORLD.endless=practiceCfg.infiniteWaves;
+    closeSetup(); sfx.pick();
+    const m=$('menu'); m.classList.add('leaving');
+    setTimeout(()=>{ m.classList.remove('leaving'); startGame(selWorld); }, 190);
+  });
 })();
 $('wprev').addEventListener('click', ()=>{ if(selWorld>0){ selWorld--; refreshWorldSel(); sfx.pick(); } });
 $('wnext').addEventListener('click', ()=>{
@@ -3821,8 +4260,8 @@ refreshWorldSel();
 $('retrybtn').addEventListener('click', startGame);
 $('wc-continue').addEventListener('click', ()=>{
   $('world-cleared').classList.add('hidden');
-  const wasChal = gameMode==='challenger';
+  const wasChal = gameMode==='challenger', wasPractice = gameMode==='practice';
   gameMode='story';
   quitToMenu();
-  if(wasChal){ refreshWorldSel(); } else { triggerUnlockReveal(); }
+  if(wasChal || wasPractice){ refreshWorldSel(); } else { triggerUnlockReveal(); }
 });

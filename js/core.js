@@ -1,10 +1,18 @@
 'use strict';
 // ============ CANVAS SETUP & SHARED HELPERS ============
 const cv = document.getElementById('game');
-const cx = cv.getContext('2d');
+// alpha:false -- the canvas is always fully repainted (void fill covers the whole viewport every
+// frame), so the browser can skip alpha-compositing this layer entirely. Costs nothing visually,
+// helps most on software-rendered canvases (common on Linux when GPU accel isn't available).
+const cx = cv.getContext('2d', { alpha:false });
 let W=0, H=0, DPR=1;
 function resize(){
-  DPR = Math.min(window.devicePixelRatio||1, 2);
+  // Capped well below the real DPR: profiling showed ~85% of active CPU time inside
+  // CanvasRenderingContext2D.drawImage's pixel-copy path, which scales with DPR^2 (a 2x
+  // cap on a 1920x1080 screen means a 3840x2160 backing buffer for every blit). This is a
+  // chunky cartoon art style, not pixel-art needing retina sharpness, so 1.5 trades a small
+  // amount of crispness for a big cut in per-frame pixel volume.
+  DPR = Math.min(window.devicePixelRatio||1, 1.5);
   W = window.innerWidth; H = window.innerHeight;
   cv.width = W*DPR; cv.height = H*DPR;
   cv.style.width = W+'px'; cv.style.height = H+'px';
@@ -36,5 +44,5 @@ function computeCamera(){
 }
 
 // ============ GLOBAL GAME-STATE FLAG ============
-const ST = { MENU:0, PLAY:1, LEVELUP:2, OVER:3, PAUSE:4, CUTSCENE:5 };
+const ST = { MENU:0, PLAY:1, LEVELUP:2, OVER:3, PAUSE:4, CUTSCENE:5, INTRO:6 };
 let state = ST.MENU;

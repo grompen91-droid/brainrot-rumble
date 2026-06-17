@@ -2,6 +2,11 @@
 // ============ CHARACTERS: selection, drawing, hooks ============
 // Loads before game.js. All draw functions render at (0,0) with ctx already translated.
 
+// ---- gear visibility: hidden by default on any non-default character, can be forced back on ----
+let gearForceVisible = localStorage.getItem('br_gear_force_visible')==='1';
+function gearShouldShow(charId){ return (charId||'gianni')==='gianni' || gearForceVisible; }
+function setGearForceVisible(v){ gearForceVisible=!!v; localStorage.setItem('br_gear_force_visible', gearForceVisible?'1':'0'); }
+
 // ---- shared drawing helpers ----
 function _stroke(ctx, size) {
   ctx.strokeStyle='#2a1c10';
@@ -81,52 +86,6 @@ function _drawFortunato(ctx, size, t) {
   ctx.restore();
 }
 
-function _drawBombardella(ctx, size, t) {
-  t = t||0;
-  const lw=Math.max(1.5,size*0.038);
-  // Humanoid base: dark red pants, red armored chest, red arms, reddish skin
-  _humanBase(ctx, size, '#6a1515', '#c03838', '#cc4040', '#d85858');
-  // Angry brows
-  ctx.strokeStyle='#2a1c10'; ctx.lineWidth=Math.max(2,size*0.045);
-  ctx.beginPath(); ctx.moveTo(-size*0.14,-size*0.30); ctx.lineTo(-size*0.04,-size*0.26); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo( size*0.14,-size*0.30); ctx.lineTo( size*0.04,-size*0.26); ctx.stroke();
-  _eyes(ctx, size);
-  // Fire spikes on head (outer)
-  ctx.fillStyle='#ff6a00'; ctx.strokeStyle='#2a1c10'; ctx.lineWidth=Math.max(1.5,size*0.032);
-  for(const ox of [-size*0.10, 0, size*0.10]){
-    ctx.beginPath(); ctx.moveTo(ox,-size*0.46); ctx.lineTo(ox-size*0.055,-size*0.34); ctx.lineTo(ox+size*0.055,-size*0.34); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-  }
-  // Inner yellow flame tips
-  ctx.fillStyle='#ffd24a';
-  for(const ox of [-size*0.10, 0, size*0.10]){
-    ctx.beginPath(); ctx.moveTo(ox,-size*0.43); ctx.lineTo(ox-size*0.024,-size*0.37); ctx.lineTo(ox+size*0.024,-size*0.37); ctx.closePath(); ctx.fill();
-  }
-}
-
-function _drawSorellaVeloce(ctx, size, t) {
-  t = t||0;
-  const lw=Math.max(1.5,size*0.038);
-  // Ponytail behind head (draw first so head covers the base)
-  ctx.beginPath(); ctx.moveTo(-size*0.06,-size*0.22);
-  ctx.bezierCurveTo(-size*0.22,-size*0.28,-size*0.28,-size*0.10,-size*0.20,-size*0.02);
-  ctx.strokeStyle='#7a4a20'; ctx.lineWidth=Math.max(3,size*0.055); ctx.lineCap='round'; ctx.stroke(); ctx.lineCap='butt';
-  // Humanoid base: blue jeans, cyan racing jacket, cyan arms, light skin
-  _humanBase(ctx, size, '#1e3f7a', '#2a8adf', '#5ab8e8', '#f0d0b0');
-  // White speed stripe on jacket
-  ctx.beginPath(); ctx.moveTo(-size*0.15,size*0.04); ctx.lineTo(size*0.15,size*0.00);
-  ctx.strokeStyle='rgba(255,255,255,0.65)'; ctx.lineWidth=Math.max(2,size*0.03); ctx.stroke();
-  _eyes(ctx, size);
-  // Speed lines trailing left
-  ctx.lineCap='round';
-  for(let i=0;i<3;i++){
-    const y=-size*0.04+i*size*0.12; const len=(i===1?0.26:0.17)*size;
-    ctx.beginPath(); ctx.moveTo(-size*0.24,y); ctx.lineTo(-size*0.24-len,y);
-    ctx.strokeStyle='#7ae8ff'; ctx.lineWidth=Math.max(1.5,size*0.025); ctx.globalAlpha=0.7-i*0.15; ctx.stroke(); ctx.globalAlpha=1;
-  }
-  ctx.lineCap='butt';
-}
-
 function _drawZioSchermo(ctx, size, t) {
   t = t||0;
   const lw=Math.max(1.5,size*0.038);
@@ -146,34 +105,6 @@ function _drawZioSchermo(ctx, size, t) {
   ctx.beginPath(); ctx.roundRect(-size*0.14,-size*0.27,size*0.28,size*0.09,size*0.03);
   ctx.fillStyle='#1a2430'; ctx.fill(); ctx.strokeStyle='#2a1c10'; ctx.lineWidth=lw; ctx.stroke();
   ctx.fillStyle='rgba(80,180,255,0.25)'; ctx.beginPath(); ctx.roundRect(-size*0.14,-size*0.27,size*0.28,size*0.09,size*0.03); ctx.fill();
-}
-
-function _drawDoppione(ctx, size, t) {
-  t = t||0;
-  const lw=Math.max(1.5,size*0.038);
-  // Left half (white) humanoid
-  ctx.save(); ctx.beginPath(); ctx.rect(-size,-size,size,size*2); ctx.clip();
-  _humanBase(ctx, size, '#e0e0e0', '#f0f0f0', '#f0f0f0', '#f0f0f0');
-  ctx.restore();
-  // Right half (black) humanoid
-  ctx.save(); ctx.beginPath(); ctx.rect(0,-size,size,size*2); ctx.clip();
-  _humanBase(ctx, size, '#1a1a1a', '#222222', '#222222', '#1a1a1a');
-  ctx.restore();
-  // Re-stroke outlines (clipping strips them)
-  ctx.strokeStyle='#2a1c10'; ctx.lineWidth=lw;
-  for(const [x,y,w,h,r] of [
-    [-size*0.12,size*0.16,size*0.09,size*0.20,size*0.03],
-    [ size*0.03,size*0.16,size*0.09,size*0.20,size*0.03],
-    [-size*0.16,-size*0.08,size*0.32,size*0.28,size*0.10],
-    [-size*0.23,-size*0.02,size*0.09,size*0.18,size*0.04],
-    [ size*0.14,-size*0.02,size*0.09,size*0.18,size*0.04],
-  ]){ ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.stroke(); }
-  ctx.beginPath(); ctx.ellipse(0,-size*0.24,size*0.16,size*0.15,0,0,Math.PI*2); ctx.stroke();
-  // Center dividing line
-  ctx.beginPath(); ctx.moveTo(0,-size*0.5); ctx.lineTo(0,size*0.5); ctx.lineWidth=Math.max(2,size*0.04); ctx.stroke();
-  // Contrasting eyes
-  ctx.fillStyle='#1a1a1a'; ctx.beginPath(); ctx.arc(-size*0.07,-size*0.24,size*0.035,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#f0f0f0'; ctx.beginPath(); ctx.arc( size*0.07,-size*0.24,size*0.035,0,Math.PI*2); ctx.fill();
 }
 
 function _drawSoldier(ctx, size, t) {
@@ -199,6 +130,22 @@ function _drawSoldier(ctx, size, t) {
   ctx.strokeStyle='#2a3618'; ctx.lineWidth=Math.max(1.5,size*0.03);
   ctx.beginPath(); ctx.moveTo(-size*0.16,-size*0.22); ctx.lineTo(-size*0.16,-size*0.11); ctx.stroke();
   ctx.beginPath(); ctx.moveTo( size*0.16,-size*0.22); ctx.lineTo( size*0.16,-size*0.11); ctx.stroke();
+}
+
+function _drawIlSaggio(ctx, size, t) {
+  t = t||0;
+  const lw=Math.max(1.5,size*0.038);
+  // Humanoid base: navy robe-legs, navy body, navy arms, pale skin
+  _humanBase(ctx, size, '#1a2640', '#243a66', '#243a66', '#e0c0a0');
+  _eyes(ctx, size);
+  // Round glasses
+  ctx.strokeStyle='#2a1c10'; ctx.lineWidth=Math.max(1.2,size*0.03);
+  for(const sx of [-0.075,0.075]){ ctx.beginPath(); ctx.arc(size*sx,-size*0.24,size*0.055,0,Math.PI*2); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(size*-0.02,-size*0.24); ctx.lineTo(size*0.02,-size*0.24); ctx.stroke();
+  // Gold trim sash
+  _fillR(ctx,size,'#e0b03a',-size*0.16,-size*0.02,size*0.32,size*0.06,size*0.02);
+  // Held book
+  _fillR(ctx,size,'#a02828',size*0.14,size*0.04,size*0.13,size*0.10,size*0.015);
 }
 
 function _drawLaStrega(ctx, size, t) {
@@ -350,8 +297,9 @@ const CHARACTERS = [
     id: 'fortunato',
     name: 'Fortunato',
     desc: 'More lucky blocks, more RNG. Can one-tap any lucky block.',
-    rarity: 'world',
-    worldUnlock: 3,
+    rarity: 'epic',
+    worldUnlock: null,
+    gemPrice: 25,     // Character Shop only — no progression unlock
     baseStats: { maxHp:70, speed:230, fireRate:0.46, dmg:12, gearDmgMul:1.0 },
     register() {
       P.fortunatoLuckyCap = 5 + Math.floor(Math.random()*4); // 5-8, fixed for the run
@@ -365,61 +313,21 @@ const CHARACTERS = [
     draw(ctx, size, t) { _drawFortunato(ctx, size, t); }
   },
   {
-    id: 'bombardella',
-    name: 'Bombardella',
-    desc: '+40% dmg, -35 HP. Every 10 kills per wave: +1 temp projectile.',
-    rarity: 'rare',
-    worldUnlock: null,
-    baseStats: { dmg:14, maxHp:65 },
-    register() {
-      onHook('waveStart', () => { if(typeof P!=='undefined'){ P.waveKills=0; P.bonusShots=0; } });
-      onHook('onKill', () => {
-        if(typeof P==='undefined') return;
-        P.waveKills=(P.waveKills||0)+1;
-        if(P.waveKills%10===0){ P.bonusShots=(P.bonusShots||0)+1; }
-      });
-    },
-    draw(ctx, size, t) { _drawBombardella(ctx, size, t); }
-  },
-  {
-    id: 'sorella_veloce',
-    name: 'Sorella Veloce',
-    desc: '+35% speed. Dash has 2 charges. Kill within 0.5s of dash = +15% dmg for 3s (stacks x3).',
-    rarity: 'rare',
-    worldUnlock: null,
-    baseStats: { speed:270 },
-    register() {
-      onHook('onDash', () => { if(typeof P!=='undefined') P.dashCharges=2; });
-    },
-    draw(ctx, size, t) { _drawSorellaVeloce(ctx, size, t); }
-  },
-  {
     id: 'zio_schermo',
     name: 'Zio Schermo',
-    desc: 'Starts each wave with a 1-hit shield. Shield recharges 8s after breaking. +15% armor.',
+    desc: 'Way higher stats, one HP.',
     rarity: 'epic',
     worldUnlock: null,
-    baseStats: { armor:0.85 },
+    gemPrice: 10,
+    baseStats: { maxHp:1, dmg:20, fireRate:0.24 },
     register() {
-      onHook('waveStart', () => {
-        if(typeof P!=='undefined') P.shield=Math.max(P.shield||0,1);
-      });
+      if(typeof P!=='undefined'){
+        P.whiteBullets = true;
+        P.bannedCards = ['hp','thick','regen'];   // no max-HP or healing cards — stays at 1 HP
+        P.maxHp = 1; P.hp = 1;   // hard clamp — gear HP bonuses apply before register(), so re-clamp here
+      }
     },
     draw(ctx, size, t) { _drawZioSchermo(ctx, size, t); }
-  },
-  {
-    id: 'doppione',
-    name: 'Doppione',
-    desc: 'Each upgrade card picked creates a ghost copy at 40% value.',
-    rarity: 'epic',
-    worldUnlock: null,
-    baseStats: {},
-    register() {
-      onHook('onCardPick', () => {
-        if(typeof P!=='undefined') P.ghostCopyChance=0.40;
-      });
-    },
-    draw(ctx, size, t) { _drawDoppione(ctx, size, t); }
   },
   {
     id: 'la_strega',
@@ -439,8 +347,9 @@ const CHARACTERS = [
     id: 'il_professore',
     name: 'Il Professore',
     desc: 'XP range x2. Start each wave 20% full. Draw 4 cards at level-up.',
-    rarity: 'world',
-    worldUnlock: 7,
+    rarity: 'epic',
+    worldUnlock: null,
+    gemPrice: 25,     // Character Shop only — no progression unlock
     baseStats: { magnet:180 },
     register() {
       onHook('waveStart', () => {
@@ -452,17 +361,15 @@ const CHARACTERS = [
   {
     id: 'fantasma',
     name: 'Fantasma',
-    desc: 'Dash replaced with Phase Shift: invincible 0.8s, slows time to 30%.',
+    desc: 'Infinite piercing, translucent shots. Enemies ignore him until he\'s close or shoots them.',
     rarity: 'world',
     worldUnlock: 9,
-    baseStats: {},
+    baseStats: { pierce:999 },
     register() {
-      onHook('onDash', () => {
-        if(typeof P==='undefined') return;
-        P.phaseShift=true;
-        P.phaseT=0.80;
-        if(typeof setTimeScale==='function') setTimeScale(0.30);
-      });
+      if(typeof P!=='undefined'){
+        P.ghostBullets = true;
+        P.stealthAggro = true;
+      }
     },
     draw(ctx, size, t) { _drawFantasma(ctx, size, t); }
   },
@@ -484,8 +391,7 @@ const CHARACTERS = [
     id: 'soldier',
     name: 'Soldier',
     desc: 'Fast, solid bullets, can\'t aim while moving.',
-    rarity: 'world',
-    worldUnlock: null,
+    rarity: 'challenger',
     chalWorldUnlock: 1,   // unlocked by beating Challenger World 1
     baseStats: { speed: 280 },   // 200 * 1.4
     register() {
@@ -497,8 +403,8 @@ const CHARACTERS = [
         lx = P.x; ly = P.y;
         const nowStill = !moved;
         if(nowStill !== wasStill){
-          if(nowStill)  P.fireRate /= 1.5;   // standing still: 50% faster
-          else          P.fireRate *= 1.5;   // moving: restore rate
+          if(nowStill){ P.fireRate /= 1.95; P.dmg *= 1.25; }   // standing still: 95% faster (50% base + 30% buff), +25% damage
+          else        { P.fireRate *= 1.95; P.dmg /= 1.25; }   // moving: restore rate/damage
           wasStill = nowStill;
         }
         P.soldierStill = nowStill;
@@ -506,6 +412,19 @@ const CHARACTERS = [
       });
     },
     draw(ctx, size, t) { _drawSoldier(ctx, size, t); }
+  },
+  {
+    id: 'il_saggio',
+    name: 'Il Saggio',
+    desc: 'Level up no longer grants cards, only power ups.',
+    rarity: 'challenger',
+    chalWorldUnlock: 2,   // unlocked by beating Challenger World 2
+    baseStats: {},
+    register() {
+      P.noCards = true;
+      onHook('onLevelUp', () => { P.fireRate *= 0.95; P.dmg *= 1.05; });
+    },
+    draw(ctx, size, t) { _drawIlSaggio(ctx, size, t); }
   },
   {
     id: 'il_campione',
@@ -594,13 +513,15 @@ function renderCharThumb(offCtx, charId, size) {
 function charIsUnlocked(charId) {
   const char = CHARACTERS.find(c=>c.id===charId);
   if(!char) return false;
-  if(char.rarity==='world'){
-    if(char.chalWorldUnlock!=null){
-      const ch = parseInt(localStorage.getItem('br_ch_unlocked')||'0');
-      return ch >= char.chalWorldUnlock;
-    }
+  // gating is decided by which threshold field is set, not by the cosmetic rarity tag —
+  // lets a character carry a real rarity (e.g. Fortunato is 'epic') while still being a world/challenger unlock
+  if(char.worldUnlock!=null){
     const unlocked = parseInt(localStorage.getItem('br_unlocked')||'0');
-    return char.worldUnlock!=null && char.worldUnlock<=unlocked;
+    return char.worldUnlock<=unlocked;
+  }
+  if(char.chalWorldUnlock!=null){
+    const ch = parseInt(localStorage.getItem('br_ch_unlocked')||'0');
+    return ch >= char.chalWorldUnlock;
   }
   return isCharOwned(charId);
 }
@@ -616,6 +537,7 @@ function grantChar(id) {
     localStorage.setItem('br_owned_chars', JSON.stringify(owned));
     if(window.markDirty) window.markDirty();
   }
+  if(typeof updateCharBadge==='function') updateCharBadge();
 }
 
 let activeCharId = localStorage.getItem('br_active_char')||'gianni';
@@ -643,8 +565,8 @@ function compositeCharCanvasURL(size) {
   const g = c.getContext('2d');
   // Draw character portrait centered
   renderCharThumb(g, activeCharId, size);
-  // Overlay gear if available
-  if(typeof GEAR_CATS!=='undefined' && typeof gearEquip!=='undefined'){
+  // Overlay gear if available (hidden by default on non-default characters)
+  if(gearShouldShow(activeCharId) && typeof GEAR_CATS!=='undefined' && typeof gearEquip!=='undefined'){
     for(const cat of GEAR_CATS){
       const uid=gearEquip[cat];
       const id=(uid && typeof gearInstanceItem==='function') ? gearInstanceItem(uid) : uid;

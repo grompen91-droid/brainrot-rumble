@@ -212,17 +212,18 @@ html,body { width:100%; height:100%; overflow:hidden; background:#6fae3d; font-f
 
 /* ===== Gamemode popup ===== */
 #gamemode-popup { z-index:35; background:rgba(20,14,8,.78); }
+.gmpop, .gmpop * { touch-action:pan-y; }
 .gmpop {
   background:#fbf3df; border:5px solid #3a2d22; border-radius:22px;
-  padding:clamp(22px,4.5vmin,38px) clamp(20px,4vmin,34px);
-  width:clamp(300px,88vw,420px);
+  padding:clamp(24px,4.8vmin,42px) clamp(22px,4.4vmin,38px);
+  width:clamp(320px,90vw,580px);
   max-height:90vh; overflow-y:auto;
   display:flex; flex-direction:column; gap:clamp(12px,2.4vmin,18px);
   position:relative; animation:popIn .26s cubic-bezier(.2,.9,.35,1.2);
   box-shadow:0 10px 0 rgba(58,45,34,.35); color:#3a2d22;
 }
 .gmpop-title {
-  font-size:clamp(24px,5vmin,38px); font-weight:900; color:#e8552d;
+  font-size:clamp(26px,5.4vmin,42px); font-weight:900; color:#e8552d;
   -webkit-text-stroke:1px #3a2d22; text-align:center;
 }
 .gmpop-close {
@@ -242,19 +243,55 @@ html,body { width:100%; height:100%; overflow:hidden; background:#6fae3d; font-f
   -webkit-text-stroke:.8px #2a1c10; box-shadow:0 6px 0 #b87a1a;
 }
 .gmpop-mode:active { transform:translateY(4px); box-shadow:0 2px 0 #b87a1a; }
-.gmpop-mname { font-size:clamp(20px,4.4vmin,32px); font-weight:900; letter-spacing:1px; }
+.gmpop-mname { font-size:clamp(20px,4.6vmin,34px); font-weight:900; letter-spacing:1px; }
 .gmpop-mdesc { font-size:clamp(10px,1.8vmin,14px); font-weight:700; color:rgba(255,255,255,.88); -webkit-text-stroke:.3px rgba(42,28,16,.4); line-height:1.4; text-align:center; }
 .gmpop-chal { background:linear-gradient(#ff5a70,#c0284a); box-shadow:0 6px 0 #8a1a30; }
 .gmpop-chal:active { box-shadow:0 2px 0 #8a1a30; }
 .gmpop-mbadge { font-size:clamp(9px,1.6vmin,13px); background:#fff; color:#c0284a; border-radius:8px; padding:1px 8px; font-weight:900; -webkit-text-stroke:0; letter-spacing:.05em; }
 .gmpop-chal .gmpop-mdesc { color:rgba(255,210,210,.88); -webkit-text-stroke:.3px rgba(80,14,24,.3); }
-.gmpop-divider { text-align:center; font-size:clamp(12px,2.2vmin,17px); font-weight:800; color:#8a7a5a; }
 .gmpop-locked { opacity:.55; cursor:not-allowed !important; }
 .gmpop-locked:active { transform:none !important; box-shadow:0 6px 0 #8a1a30 !important; }
 .gmpop-mlock { font-size:clamp(10px,1.9vmin,14px); font-weight:900; color:rgba(255,210,210,.9); -webkit-text-stroke:0; }
+.gmpop-practice { background:linear-gradient(#4ad0c0,#2a9a8c); box-shadow:0 6px 0 #1c6a60; }
+.gmpop-practice:active { box-shadow:0 2px 0 #1c6a60; }
+.gmpop-practice .gmpop-mbadge { color:#2a9a8c; }
+.gmpop-practice .gmpop-mdesc { color:rgba(220,255,250,.88); -webkit-text-stroke:.3px rgba(14,60,52,.3); }
+
+/* ===== Practice mode popups (reuse .sdrop-inner shell) ===== */
+#practice-confirm-popup, #practice-setup-popup, #practice-enemy-popup, #practice-boss-popup {
+  background:rgba(20,14,8,.78);
+}
+#practice-setup-popup .sdrop-inner, #practice-enemy-popup .sdrop-inner, #practice-boss-popup .sdrop-inner,
+#practice-setup-popup .sdrop-inner *, #practice-enemy-popup .sdrop-inner *, #practice-boss-popup .sdrop-inner * {
+  touch-action:pan-y;
+}
+#pcfg-mapnote { color:#8a7a5a; font-weight:700; }
+#pcfg-enemy-list, #pcfg-boss-list {
+  max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px;
+  margin:4px 0; padding-right:2px;
+}
+.pickrow {
+  display:flex; align-items:center; gap:clamp(8px,1.6vmin,12px);
+  padding:clamp(8px,1.6vmin,12px) clamp(10px,2vmin,14px);
+  border:2px solid #2a1c10; border-radius:12px; cursor:pointer;
+  background:#e8e0cc; font-weight:800; font-size:clamp(13px,2.4vmin,17px); color:#3a2d22;
+}
+.pickrow.on { background:#bfe6c0; border-color:#3f8a36; }
+.pickrow img { width:clamp(26px,5vmin,34px); height:clamp(26px,5vmin,34px); flex:0 0 auto; }
+.pickrow .pickname { flex:1; text-align:left; }
+.pickrow .pickmark { font-weight:900; width:1.4em; text-align:center; }
 
 /* SHOP item cards (vertical, ribboned) */
 #shopgrid { display:flex; flex-direction:column; gap:clamp(8px,1.8vmin,15px); width:100%; }
+.dailycoins { display:flex; align-items:center; justify-content:space-between; gap:clamp(8px,1.8vmin,14px);
+  background:#fff3cf; border:4px solid #e0a92e; border-radius:16px; padding:clamp(10px,2vmin,16px);
+  box-shadow:0 4px 0 rgba(0,0,0,.18); }
+.dailycoins.claimed { background:#eef0e6; border-color:#9aa3af; }
+.dcrow { display:flex; align-items:center; gap:6px; font-weight:900; font-size:clamp(16px,3vmin,22px); color:#26313f; }
+.dcrow .coinico { width:1.3em; height:1.3em; }
+.dcamt { color:#c47f10; }
+.dailycoins .bigbtn { font-size:clamp(13px,2.4vmin,17px); padding:clamp(8px,1.6vmin,12px) clamp(16px,3vmin,22px); }
+.dcclaimed { font-weight:800; font-size:clamp(11px,2vmin,14px); color:#5a6472; }
 .ggrid { display:grid; grid-template-columns:repeat(2,1fr); gap:clamp(8px,1.8vmin,15px); width:100%; }
 .scard { position:relative; display:flex; flex-direction:column; align-items:center; gap:clamp(5px,1.2vmin,10px);
   background:#e9eef5; border:4px solid #b9c4d2; border-radius:16px; padding:clamp(10px,2vmin,16px) clamp(6px,1.4vmin,12px);
@@ -396,6 +433,7 @@ html,body { width:100%; height:100%; overflow:hidden; background:#6fae3d; font-f
 .stag { display:inline-block; font-size:clamp(9px,1.5vmin,12px); font-weight:900; letter-spacing:.04em;
   padding:1px 7px; border-radius:6px; margin:0 0 3px 4px; border:2px solid currentColor; }
 .stag.s-dmg{ color:#d98a2b; } .stag.s-hp{ color:#d61f48; } .stag.s-speed{ color:#3f9a36; } .stag.s-range{ color:#2f86c8; }
+.sbonus { font-size:clamp(10px,1.7vmin,13px); font-weight:900; color:#3a2d22; margin:0 0 3px 2px; }
 .sbonus { margin-top:3px; }
 /* rarity tag chip (shop cards + crate reveal) */
 .rtag { display:inline-block; font-size:clamp(9px,1.6vmin,13px); font-weight:900; letter-spacing:.05em;
@@ -563,8 +601,8 @@ html,body { width:100%; height:100%; overflow:hidden; background:#6fae3d; font-f
 #pause .panel { display:flex; flex-direction:column; align-items:stretch; gap:clamp(12px,2.4vmin,20px); }
 #pause .ptitle { font-size:clamp(28px,6vmin,48px); font-weight:900; color:#e8552d; -webkit-text-stroke:1.5px #3a2d22; margin-bottom:clamp(4px,1vmin,10px); }
 #pause .bigbtn { width:100%; }
-#pause .bigbtn.quit { background:#d9694a; box-shadow:0 6px 0 #a0412c; font-size:clamp(16px,3.2vmin,24px); }
-#pause .bigbtn.quit:active { box-shadow:0 2px 0 #a0412c; }
+#pause .bigbtn.quit, #practice-confirm-popup .bigbtn.quit { background:#d9694a; box-shadow:0 6px 0 #a0412c; font-size:clamp(16px,3.2vmin,24px); }
+#pause .bigbtn.quit:active, #practice-confirm-popup .bigbtn.quit:active { box-shadow:0 2px 0 #a0412c; }
 
 /* Zoom controls */
 #zoomctl { position:fixed; right:max(14px,env(safe-area-inset-right)); top:50%; transform:translateY(-50%); z-index:6; display:flex; flex-direction:column; gap:clamp(9px,1.8vmin,16px); }
@@ -574,6 +612,11 @@ html,body { width:100%; height:100%; overflow:hidden; background:#6fae3d; font-f
   box-shadow:0 4px 0 rgba(58,45,34,0.35); cursor:pointer;
 }
 #zoomctl button:active { transform:translateY(3px); box-shadow:0 1px 0 rgba(58,45,34,0.35); }
+
+#introskip { position:fixed; z-index:30; right:max(14px,env(safe-area-inset-right)); top:max(14px,env(safe-area-inset-top));
+  font-weight:900; font-size:clamp(13px,2.4vmin,18px); color:#fff; background:rgba(20,14,8,.55);
+  border:3px solid rgba(255,255,255,.6); border-radius:14px; padding:8px 16px; cursor:pointer; }
+#introskip:active { transform:translateY(2px); }
 
 /* Loading screen (covers the menu until all sprites are pre-generated) */
 #loading { z-index:50; background:#5a3d28; transition:opacity .4s ease; }
@@ -691,6 +734,18 @@ html,body { width:100%; height:100%; overflow:hidden; background:#6fae3d; font-f
 .gemshopcost { display:flex; align-items:center; gap:4px; font-weight:900; font-size:clamp(12px,2.2vmin,17px); color:#7a3ab8; }
 .gemshopcost .gemico-sm { color:#b06ff0; font-size:1.1em; }
 .weeklycard { border-color:#e0a92e; box-shadow:0 0 14px rgba(224,169,46,.5); background:linear-gradient(160deg,#fef8e8 0%,#fff7d0 100%); }
+/* Pet recruit gacha banner: portrait pops on the left, no name/rarity/box behind it */
+.petgacha { display:flex; align-items:center; gap:clamp(10px,2.2vmin,18px); width:100%;
+  border:4px solid #2a1c10; border-radius:18px; padding:clamp(10px,2vmin,16px);
+  background:linear-gradient(115deg,#7a45cf 0%,#a866f2 45%,#e0a92e 100%);
+  box-shadow:0 6px 0 rgba(0,0,0,.25); overflow:hidden; }
+/* .pettile is reused here only for its JS data-petid hook -- strip its grid-tile box look */
+.petgacha-port.pettile { width:clamp(80px,18vmin,140px); height:clamp(80px,18vmin,140px); flex:0 0 auto;
+  aspect-ratio:auto; border:none; border-radius:0; background:none; box-shadow:none;
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,.35)); }
+.petgacha-port.pettile canvas { width:100%; height:100%; }
+.petgacha-right { flex:1; display:flex; flex-direction:column; align-items:flex-start; gap:clamp(8px,1.6vmin,12px); }
+.petgacha-title { font-weight:900; font-size:clamp(16px,3.2vmin,24px); color:#fff; -webkit-text-stroke:.6px #2a1c10; letter-spacing:.02em; }
 /* Big vertical weekly legendary card */
 .weeklycard-v { flex-direction:column; align-items:center; gap:clamp(8px,1.6vmin,14px); text-align:center; padding:clamp(14px,2.8vmin,22px); }
 .weekly-header { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; width:100%; }

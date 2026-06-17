@@ -92,7 +92,9 @@ function _weeklyResetStr() {
 // ---- Character Shop data ----
 function getCharDailyShop() {
   const seed=dailyCharSeed();
-  const pool=CHARACTERS.filter(c=>c.rarity!=='world'&&c.rarity!=='legendary');
+  // progression-gated characters (world/challenger unlocks, regardless of cosmetic rarity tag) aren't pullable;
+  // legendary has its own separate pool (getCharLegendaryShop)
+  const pool=CHARACTERS.filter(c=>c.worldUnlock==null&&c.chalWorldUnlock==null&&c.rarity!=='legendary');
   // Use mulberry32/hashStr from shop.js (loaded after recruit.js at runtime)
   const rng=mulberry32(hashStr(String(seed)));
   const shuffled=pool.slice();
@@ -109,10 +111,11 @@ function getCharWeeklyShop() {
   return shuffled[0];
 }
 const CHAR_SHOP_PRICE={ rare:50, epic:100, legendary:150, common:20 };
+function charGemPrice(char){ return char.gemPrice!=null ? char.gemPrice : (CHAR_SHOP_PRICE[char.rarity]||50); }
 let charShopDailyIdx=0;
 function buyCharacter(id) {
   const char=CHARACTERS.find(c=>c.id===id); if(!char) return;
-  const price=CHAR_SHOP_PRICE[char.rarity]||50;
+  const price=charGemPrice(char);
   if(isCharOwned(id)){ alert('Already owned'); return; }
   if(!spendGems(price)){ alert('Not enough gems!'); return; }
   grantChar(id);
@@ -120,9 +123,8 @@ function buyCharacter(id) {
   if(typeof sfx!=='undefined') sfx.evolve();
 }
 
-// ---- Pet Recruit / Pity ----
+// ---- Pet Recruit ----
 const PET_WEIGHTS={ common:55, rare:35, epic:9, legendary:1 };
-const PET_PITY_EPIC=10, PET_PITY_LEG=50;
 const PET_PULL_COST=5;
 function weightedRarityRoll(weights) {
   let total=0; for(const k in weights) total+=weights[k];
@@ -130,13 +132,13 @@ function weightedRarityRoll(weights) {
   for(const k of ['common','rare','epic','legendary']){ r-=(weights[k]||0); if(r<=0) return k; }
   return 'common';
 }
+function dailyFeaturedPet() {
+  const rng=mulberry32(hashStr('petbanner'+dailyCharSeed()));
+  return PETS[Math.floor(rng()*PETS.length)];
+}
 function recruitPet() {
   if(!spendGems(PET_PULL_COST)) return null;
-  let pity=+(localStorage.getItem('br_pet_pity')||0)+1;
-  let rarity=weightedRarityRoll(PET_WEIGHTS);
-  if(pity>=PET_PITY_LEG){ rarity='legendary'; pity=0; }
-  else if(pity>=PET_PITY_EPIC&&rarity==='common'){ rarity='rare'; }
-  localStorage.setItem('br_pet_pity',pity);
+  const rarity=weightedRarityRoll(PET_WEIGHTS);
   const pool=PETS.filter(p=>p.rarity===rarity&&!isPetOwned(p.id));
   if(!pool.length){
     const anyPool=PETS.filter(p=>p.rarity===rarity);
@@ -176,7 +178,7 @@ function renderShopCharSection() {
   // ---- WEEKLY LEGENDARY (tall vertical card) ----
   if(weekly){
     const owned=isCharOwned(weekly.id);
-    const price=CHAR_SHOP_PRICE[weekly.rarity]||150;
+    const price=charGemPrice(weekly);
     const poor=gemBalance<price;
     const resetStr=_weeklyResetStr();
     html+='<div class="scard weeklycard weeklycard-v">';
@@ -196,7 +198,7 @@ function renderShopCharSection() {
     if(charShopDailyIdx>=daily.length) charShopDailyIdx=0;
     const card=daily[charShopDailyIdx];
     const owned=isCharOwned(card.id);
-    const price=CHAR_SHOP_PRICE[card.rarity]||50;
+    const price=charGemPrice(card);
     const poor=gemBalance<price;
     const rarLabel=(typeof RAR!=='undefined'&&RAR[card.rarity])?RAR[card.rarity].name:card.rarity.toUpperCase();
     html+='<div class="charcarousel">';
@@ -221,16 +223,18 @@ function renderShopCharSection() {
 }
 
 function renderPetRecruitSection() {
-  const pity=+(localStorage.getItem('br_pet_pity')||0);
   const poor=gemBalance<PET_PULL_COST;
   const gem='<span class="gemico-sm">◆</span>';
-  const ownedPets=PETS.filter(p=>isPetOwned(p.id));
+  const featured=dailyFeaturedPet();
 
   let html='<div class="shopsec">';
   html+='<div class="banner"><span>PET RECRUIT</span></div>';
-  html+='<div class="pullzone">';
+  html+='<div class="petgacha">';
+  html+='<div class="petgacha-port pettile" data-petid="'+featured.id+'"><canvas class="pettile-canvas" width="140" height="140"></canvas></div>';
+  html+='<div class="petgacha-right">';
+  html+='<div class="petgacha-title">GET RANDOM PET</div>';
   html+='<button class="pullbtn'+(poor?' poor':'')+'" id="petpullbtn">'+gem+PET_PULL_COST+' — RECRUIT PET</button>';
-  html+='<div class="pitytxt">Pity: '+pity+' / '+PET_PITY_LEG+' (guaranteed legendary) · '+Math.max(0,PET_PITY_EPIC-pity)+' for guaranteed rare</div>';
+  html+='</div>';
   html+='</div>';
   html+='<div class="invhint" style="margin-top:4px">Manage pets in the Equipment tab</div>';
   html+='</div>'; // shopsec
@@ -340,7 +344,7 @@ function initRecruitUI(container) {
       const card=daily[charShopDailyIdx]; if(!card) return;
       const gem='<span class="gemico-sm">◆</span>';
       const owned=isCharOwned(card.id);
-      const price=CHAR_SHOP_PRICE[card.rarity]||50;
+      const price=charGemPrice(card);
       const poor=gemBalance<price;
       const rarLabel=(typeof RAR!=='undefined'&&RAR[card.rarity])?RAR[card.rarity].name:card.rarity.toUpperCase();
       let html='<div class="charcarousel-card scard r-'+card.rarity+(dir===1?' caro-slide-right':dir===-1?' caro-slide-left':'')+'">';
@@ -400,8 +404,8 @@ function initRecruitUI(container) {
     const petId=tile.dataset.petid;
     const pet=PETS.find(p=>p.id===petId);
     if(!pet||!pet.draw) return;
-    const g=canvas.getContext('2d');
-    g.save(); g.translate(28,28); pet.draw(g,56,0); g.restore();
+    const g=canvas.getContext('2d'), sz=canvas.width;
+    g.save(); g.translate(sz/2,sz/2); pet.draw(g,sz*0.82,0); g.restore();
   });
 
   // Render weekly char thumbnail
