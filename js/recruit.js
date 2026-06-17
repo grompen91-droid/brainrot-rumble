@@ -148,7 +148,6 @@ function recruitPet() {
   }
   const picked=pool[Math.floor(Math.random()*pool.length)];
   grantPet(picked.id);
-  if(typeof sfx!=='undefined') sfx.evolve();
   return { pet:picked, duplicate:false };
 }
 
@@ -283,6 +282,7 @@ function _showPullResult(result) {
     '</div>';
 
   ov.classList.remove('hidden');
+  if(typeof sfx!=='undefined') sfx.drumroll();
 
   const scene=document.getElementById('gachaScene');
   const cs=document.getElementById('gachaCS');
@@ -296,6 +296,7 @@ function _showPullResult(result) {
     if(phase!==0) return;
     phase=1;
     if(csTimer){ clearTimeout(csTimer); csTimer=null; }
+    if(typeof sfx!=='undefined') sfx.reveal();
     if(orb) orb.classList.add('gacha-burst');
     cs.classList.add('cs-exit');
     setTimeout(()=>{

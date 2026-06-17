@@ -189,11 +189,11 @@ _stroke(ctx, size)  // apply the standard dark outline to whatever path is open
 | `sorella_veloce` | Sorella Veloce | rare | +35% speed, double dash |
 | `zio_schermo` | Zio Schermo | epic | Wave-start shield, +15% armor |
 | `doppione` | Doppione | epic | 40% ghost copy of every card pick |
-| `il_professore` | Il Professore | world (7) | 2× XP range, 20% XP pre-fill per wave |
+| `il_professore` | Il Professore | world (8) | 2× XP range, 20% XP pre-fill per wave |
 | `fantasma` | Fantasma | legendary (shop only) | Infinite piercing, translucent shots, stealth aggro |
 | `il_cecchino` | Il Cecchino | world (3) | 3× dmg, 5× fire delay, 60 HP, 1.5× gear dmg, no split shots |
 | `il_campione` | Il Campione | world (10) | 12% kills → mini lucky block, boss kills → +2 dmg |
-| `engineer` | Engineer | world (1) | No player bullets; 2 turrets share all his stats; dash places a stationary turret; exclusive Minigun/Flamethrower turret cards |
+| `engineer` | Engineer | epic (shop, 15 gems) | No player bullets; 2 turrets share all his stats; dash places a stationary turret; exclusive Minigun/Flamethrower turret cards |
 
 ---
 

@@ -351,9 +351,8 @@ const CHARACTERS = [
     id: 'il_professore',
     name: 'Il Professore',
     desc: 'XP range x2. Start each wave 20% full. Draw 4 cards at level-up.',
-    rarity: 'epic',
-    worldUnlock: null,
-    gemPrice: 25,     // Character Shop only — no progression unlock
+    rarity: 'world',
+    worldUnlock: 8,   // World 9
     baseStats: { magnet:180 },
     register() {
       onHook('waveStart', () => {
@@ -451,8 +450,9 @@ const CHARACTERS = [
     id: 'engineer',
     name: 'Engineer',
     desc: 'Fires no bullets of his own. Starts with 2 turrets that share all his stats. Dash places a stationary turret instead.',
-    rarity: 'world',
-    worldUnlock: 1,   // World 2 — temporary early unlock
+    rarity: 'epic',
+    worldUnlock: null,
+    gemPrice: 15,     // Character Shop only — no progression unlock
     baseStats: {},
     register() {
       P.noPlayerShots = true;

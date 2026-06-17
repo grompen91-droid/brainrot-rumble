@@ -15,6 +15,19 @@ function beep(freq, dur, type='square', vol=0.05, slide=0){
     o.start(); o.stop(AC.currentTime+dur);
   }catch(e){}
 }
+function noiseBurst(dur, vol, hp){
+  if(!AC || sfxMuted) return;
+  try{
+    const n=Math.max(1,Math.floor(AC.sampleRate*dur)), b=AC.createBuffer(1,n,AC.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+    const s=AC.createBufferSource(); s.buffer=b;
+    const f=AC.createBiquadFilter(); f.type=hp?'highpass':'bandpass'; f.frequency.value=hp?6000:1900;
+    const g=AC.createGain(), t=AC.currentTime;
+    g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    s.connect(f); f.connect(g); g.connect(AC.destination);
+    s.start(t); s.stop(t+dur+0.02);
+  }catch(e){}
+}
 const sfx = {
   shoot: ()=>beep(700,0.05,'square',0.018,-260),
   hit:   ()=>beep(200,0.06,'square',0.04,-80),
@@ -29,7 +42,17 @@ const sfx = {
   pick:  ()=>{ beep(660,0.05,'square',0.045); setTimeout(()=>beep(988,0.08,'square',0.045),55); },
   evolve:()=>{ [523,659,880,1175].forEach((f,i)=>setTimeout(()=>beep(f,0.13,'square',0.05),i*85)); },
   warn:  ()=>{ beep(150,0.3,'sawtooth',0.08,-18); setTimeout(()=>beep(150,0.3,'sawtooth',0.08,-18),320); },
-  win:   ()=>{ [392,523,659,784].forEach((f,i)=>setTimeout(()=>beep(f,0.14,'triangle',0.06),i*70)); }
+  win:   ()=>{ [392,523,659,784].forEach((f,i)=>setTimeout(()=>beep(f,0.14,'triangle',0.06),i*70)); },
+  drumroll: ()=>{   // gacha suspense build-up: steady taps speeding up, ending in a cymbal crash
+    const n=16;
+    for(let i=0;i<n;i++){
+      const t = i<8 ? i*70 : 560+(i-8)*45;
+      const vol = 0.03+i*0.0022;
+      setTimeout(()=>noiseBurst(0.045,vol,false), t);
+    }
+    setTimeout(()=>{ noiseBurst(0.35,0.1,true); beep(1568,0.3,'triangle',0.05,500); }, 560+8*45+60);
+  },
+  reveal: ()=>{ [880,1318].forEach((f,i)=>setTimeout(()=>beep(f,0.16,'sine',0.06,i?0:160),i*90)); }
 };
 
 // ============ MUSIC (procedural: drums + bass over a long chord bed, melody generated live) ============
