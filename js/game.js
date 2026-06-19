@@ -331,6 +331,9 @@ const BOSSES_DIRT = [
   { spr:'orcalero', name:'ORCALERO ORCALA',           hp:690, r:58, pattern:'rings',  phased:true, moveKey:'croco2' },
   { spr:'madudung',  name:'MADUDUNGDUNG',             hp:840, r:62, pattern:'chaos',  bars:2, hp2:580, duo:'garamaraman' },
 ];
+// Sky (world 8): wave 15 = Orcalero Orcala, wave 20 (final) = Madudungdung — the two bosses that
+// otherwise never spawn (every other world only reaches the first 4 entries of its boss list).
+const BOSSES_SKY = [BOSSES_DIRT[0], BOSSES_DIRT[1], BOSSES_DIRT[4], BOSSES_DIRT[5]];
 // ============ WORLD 2 — CITRUS COAST roster (real OG Italian Brainrots, recreated). band 1: easy, mostly chasers. ============
 const FOES_W2 = [
   // Tier I — fodder
@@ -527,7 +530,7 @@ const WORLDS = [
   { id:'sky', name:'SKYLAND', band:6, waveTarget:20, endless:false, map:{w:3000,h:3000}, enemyTint:'#bfe0ff',
     theme:{ void:'#8fb6cf', tile1:'#cfe6f5', tile2:'#c0dcef', tuft:'rgba(140,180,210,0.28)',
             wall:null, post:null, bg:'#c2def0', tint:'#bfe0ff', music:'world_sky' },
-    foes:FOES_DIRT, bosses:BOSSES_DIRT },
+    foes:FOES_DIRT, bosses:BOSSES_SKY },
   { id:'crystal', name:'CRYSTAL CAVES', band:7, waveTarget:20, endless:false, map:{w:1100,h:4400}, enemyTint:'#b08fe0',
     theme:{ void:'#3a2a52', tile1:'#6a4f8a', tile2:'#5e4578', tuft:'rgba(150,120,200,0.28)',
             wall:'#2f2247', post:'#5a4078', postDark:'#1e1530', bg:'#5a4078', tint:'#b08fe0', music:'world_crystal' },
