@@ -4,7 +4,7 @@ let shake = 0, hitFlash = 0, hitstop = 0, tPrev = 0, elapsed = 0;
 let deathShakeOn = localStorage.getItem('br_deathshake')!=='0';   // screen shake on enemy kill (off = boss telegraphs/hits still shake)
 
 const P = {}; // player
-let bullets=[], ebullets=[], petBullets=[], enemies=[], gems=[], parts=[], texts=[], zones=[], holes=[], luckies=[];
+let bullets=[], ebullets=[], petBullets=[], enemies=[], gems=[], texts=[], zones=[], holes=[], luckies=[];   // particles live in the SoA pool (see spawnPart), not an array
 let skibidiBullets=[], skibidiTimers=[];   // Skibidi Toilet card: edge-bouncing persistent bullets, own lifecycle
 let turrets=[];   // Walking Turret card: chain-follows behind the pet, each {x,y,cd,face}
 let miniTurrets=[];    // Minigun Turret card (Engineer-only): chain-follows, each {x,y,cd,face}
@@ -123,7 +123,7 @@ function damageLucky(lb,dmg,fx,fy,crit){
 // burst the block open and scatter its reward: heal heart / magnet / 3 gold gems
 function popLucky(lb){
   burst(lb.x,lb.y,'#ffd23a',26,260); shake=Math.max(shake,6); sfx.evolve();
-  parts.push({x:lb.x,y:lb.y,vx:0,vy:0,life:0.4,max:0.4,color:'#fff0b0',r:lb.r,ring:true,gr:420});
+  spawnPart(lb.x,lb.y,0,0,0.4,0.4,'#fff0b0',lb.r,1,420);
   if(lb.heal){   // boss-fight block: drops a fixed-heal heart only (no magnet/gold/50-heart)
     const a=rand(0,TAU), s=rand(40,90); gems.push({x:lb.x,y:lb.y,heart:true,heal:lb.heal,t:0,vx:Math.cos(a)*s,vy:Math.sin(a)*s});
     floatText(lb.x,lb.y-lb.r-10,'LUCKY!','#ffd23a',18);
@@ -179,9 +179,71 @@ const MAX_HAZARD   = 4;                     // "earthquake" types: ground AoE / 
 const MAX_BURST    = 4;                     // burst shooters: ring volleys or 3+ aimed shots
 const SPECIAL_HP_BUFF = 1.6, SPECIAL_DMG_BUFF = 1.3;   // hazard/burst foes are rarer, so tankier & hit harder
 const MAXEB = 240;   // hard cap on enemy bullets (bound worst-case render + GC)
-// particle cap is user-tunable (Graphics settings): scales the base 160 by GFX.particles (0=off)
-let MAXPARTS = Math.round(160 * GFX.particles);
-function applyGfxParts(){ MAXPARTS = Math.round(160 * GFX.particles); }
+
+// ============ PARTICLE POOL (Structure-of-Arrays, zero per-spawn allocation) ============
+// Particles were the throughput wall: every burst did parts.push({...}) (object alloc -> GC
+// churn) and rendered with beginPath/arc/fill per dot. Replaced with parallel typed arrays:
+// no allocation on spawn, O(1) swap-remove on death, and a flat fillRect batch on render. This
+// scales to tens of thousands of live particles on a 2D canvas (the realistic per-frame ceiling
+// for Canvas2D; truly "millions" simulated AND drawn at 60fps needs a GPU/WebGL backend, but the
+// pool itself is allocation-free so raising PCAP costs only memory, not GC).
+const PART_BASE = IS_TOUCH ? 12000 : 60000;   // hard pool capacity (preallocated once); active count is capped by MAXPARTS
+let PCAP = PART_BASE;
+let pX, pY, pVX, pVY, pLife, pMax, pR, pGR, pLW, pFlag, pCol, pCount;
+function _allocParts(n){
+  PCAP = n;
+  pX=new Float32Array(n); pY=new Float32Array(n); pVX=new Float32Array(n); pVY=new Float32Array(n);
+  pLife=new Float32Array(n); pMax=new Float32Array(n); pR=new Float32Array(n); pGR=new Float32Array(n);
+  pLW=new Float32Array(n); pFlag=new Uint8Array(n);   // pFlag bit0 = ring
+  pCol=new Array(n).fill('#fff'); pCount=0;
+}
+_allocParts(PART_BASE);
+function clearParts(){ pCount=0; }
+// single allocation-free spawn entry point used by every FX. ring/gr/lw optional.
+function spawnPart(x,y,vx,vy,life,max,color,r,ring,gr,lw){
+  if(pCount>=MAXPARTS) return;          // at the active cap: drop the newest (matches old behavior)
+  const i=pCount++;
+  pX[i]=x; pY[i]=y; pVX[i]=vx; pVY[i]=vy; pLife[i]=life; pMax[i]=max||life;
+  pR[i]=r; pFlag[i]=ring?1:0; pGR[i]=gr||0; pLW[i]=lw||0; pCol[i]=color;
+}
+function _killPart(i){                  // O(1) swap-remove: copy last active into the dead slot (order irrelevant for FX)
+  const j=--pCount; if(i!==j){
+    pX[i]=pX[j]; pY[i]=pY[j]; pVX[i]=pVX[j]; pVY[i]=pVY[j]; pLife[i]=pLife[j]; pMax[i]=pMax[j];
+    pR[i]=pR[j]; pFlag[i]=pFlag[j]; pGR[i]=pGR[j]; pLW[i]=pLW[j]; pCol[i]=pCol[j];
+  }
+}
+function updateParts(dt){
+  let i=0;
+  while(i<pCount){
+    if(pFlag[i]&1){                     // ring: grow + fade
+      pR[i]+=(pGR[i]||600)*dt; pLife[i]-=dt;
+      if(pLife[i]<=0 || pR[i]>=1400){ _killPart(i); continue; }
+    } else {                            // dot: integrate + friction + fade
+      pX[i]+=pVX[i]*dt; pY[i]+=pVY[i]*dt; pVX[i]*=0.9; pVY[i]*=0.9; pLife[i]-=dt;
+      if(pLife[i]<=0){ _killPart(i); continue; }
+    }
+    i++;
+  }
+}
+// flat render: rings stroked individually (few); dots drawn as alpha-faded fillRects (no path machinery).
+function renderParts(vx0,vy0,vx1,vy1){
+  for(let i=0;i<pCount;i++){
+    const x=pX[i], y=pY[i], r=pR[i];
+    if(x<vx0-r-4||x>vx1+r+4||y<vy0-r-4||y>vy1+r+4) continue;
+    let a=pLife[i]/pMax[i]; if(a<0) a=0; else if(a>1) a=1;
+    if(pFlag[i]&1){                     // ring
+      cx.globalAlpha=a*0.6; cx.strokeStyle=pCol[i]; cx.lineWidth=(pLW[i]||5)*a+1;
+      cx.beginPath(); cx.arc(x,y,r,0,TAU); cx.stroke();
+    } else {                            // dot: square spark (fillRect is far cheaper than arc+fill at mass)
+      const rr=r*(0.45+0.55*a);
+      cx.globalAlpha=a; cx.fillStyle=pCol[i]; cx.fillRect(x-rr,y-rr,rr*2,rr*2);
+    }
+  }
+  cx.globalAlpha=1;
+}
+// particle cap is user-tunable (Graphics settings): scales the base capacity by GFX.particles (0=off)
+let MAXPARTS = Math.round(PART_BASE * GFX.particles);
+function applyGfxParts(){ MAXPARTS = Math.min(PCAP, Math.round(PART_BASE * GFX.particles)); if(pCount>MAXPARTS) pCount=MAXPARTS; }
 function foeIsShooter(d){ return !!d.shoot; }
 function foeIsHazard(d){ return !!d.aoe || (d.cast && (d.cast.kind==='geyser'||d.cast.kind==='debris')); }
 function foeIsBurst(d){ return !!d.shoot && (d.shoot.type==='ring' || (d.shoot.n||1)>=3); }
@@ -551,7 +613,7 @@ function cutsceneUpdate(dt){
   b.deathScale = 1 + cut.t*0.5;
   cut.alpha = Math.max(0, 1 - (cut.t-1.0)/0.8);           // boss fades out 1.0..1.8s
   if(cut.t > 1.6) cut.fade = Math.min(1, (cut.t-1.6)/0.7); // screen fades to theme color
-  for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.t=(p.t||0)+dt; p.x+=(p.vx||0)*dt; p.y+=(p.vy||0)*dt; p.life-=dt; if(p.life<=0) parts.splice(i,1); }
+  updateParts(dt);
   for(let i=texts.length-1;i>=0;i--){ const tx=texts[i]; tx.t=(tx.t||0)+dt; tx.x+=(tx.vx||0)*dt; tx.y+=(tx.vy||0)*dt; tx.life-=dt; if(tx.life<=0) texts.splice(i,1); }
   if(cut.t > 2.5){
     cut=null;
@@ -1185,7 +1247,7 @@ function _doStartGame(wi){
   if(typeof registerActiveChar==='function') registerActiveChar();
   if(typeof registerActivePet==='function') registerActivePet();
   timeScale=1.0;
-  bullets=[]; ebullets=[]; petBullets=[]; enemies=[]; gems=[]; parts=[]; texts=[]; zones=[]; holes=[]; luckies=[];
+  bullets=[]; ebullets=[]; petBullets=[]; enemies=[]; gems=[]; texts=[]; zones=[]; holes=[]; luckies=[]; clearParts();
   wave=1; kills=0; elapsed=0; boss=null; waveGapT=0; arena=null; bossPending=0;
   luckyTimer=rand(10,18);
   worldCoins=0;
@@ -1403,22 +1465,22 @@ function spawnEnemy(){
 function burst(x,y,color,n=10,spd=160){
   for(let i=0;i<n;i++){
     const a=rand(0,TAU), s=rand(spd*0.3,spd);
-    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(0.18,0.48),max:0.48,color,r:rand(2.5,6)});
+    spawnPart(x,y,Math.cos(a)*s,Math.sin(a)*s,rand(0.18,0.48),0.48,color,rand(2.5,6));
   }
 }
 // satisfying impact: quick expanding ring + round sparks + white flash core
 function hitSpark(x,y,color,crit){
-  parts.push({x,y,vx:0,vy:0,life:0.16,max:0.16,color,r:crit?8:5,ring:true,gr:crit?280:190,lw:crit?3:2.5});
+  spawnPart(x,y,0,0,0.16,0.16,color,crit?8:5,1,crit?280:190,crit?3:2.5);
   const n=crit?8:5;
   for(let i=0;i<n;i++){ const a=rand(0,TAU), s=rand(40,crit?210:130);
-    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(0.1,0.28),max:0.28,color,r:rand(1.5,crit?4:2.5)}); }
-  parts.push({x,y,vx:0,vy:0,life:0.10,max:0.10,color:'#ffffff',r:crit?6:4});
+    spawnPart(x,y,Math.cos(a)*s,Math.sin(a)*s,rand(0.1,0.28),0.28,color,rand(1.5,crit?4:2.5)); }
+  spawnPart(x,y,0,0,0.10,0.10,'#ffffff',crit?6:4);
 }
 // muzzle flash: short colored burst at the shooter so its projectiles are easy to trace back
 function muzzleFlash(x,y,color){
-  parts.push({x,y,vx:0,vy:0,life:0.18,max:0.18,color,r:9,ring:true,gr:150,lw:3});
+  spawnPart(x,y,0,0,0.18,0.18,color,9,1,150,3);
   for(let i=0;i<5;i++){ const a=rand(0,TAU), s=rand(40,120);
-    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(0.12,0.28),max:0.28,color,r:rand(1.5,3)}); }
+    spawnPart(x,y,Math.cos(a)*s,Math.sin(a)*s,rand(0.12,0.28),0.28,color,rand(1.5,3)); }
 }
 // Pulse Wave radius/damage — radius buffed to actually match how big the shockwave looks; damage nerfed and now scales off both radius and P.dmg instead of a flat number
 function novaStats(){
@@ -1429,7 +1491,7 @@ function novaStats(){
 // shared shockwave used by Nova synergies (Aegis Nova, Event Horizon)
 function novaBlast(x,y,R,dmg){
   burst(x,y,'#9fd0ff',24,400); shake=Math.max(shake,8);
-  parts.push({x,y,vx:0,vy:0,life:0.4,max:0.4,color:'#cfeaff',r:R,ring:true,gr:480});
+  spawnPart(x,y,0,0,0.4,0.4,'#cfeaff',R,1,480);
   for(const e of enemies){ if(dist2(x,y,e.x,e.y) < R*R) damageEnemy(e,dmg,x,y,false); }
   ebullets = ebullets.filter(b => dist2(x,y,b.x,b.y) > R*R);
   sfx.boss();
@@ -1738,7 +1800,7 @@ function update(dt){
   if(P.dashT>0){
     P.dashT-=dt;
     P.x += P.dvx*640*dt; P.y += P.dvy*640*dt;
-    if(Math.random()<0.6) parts.push({x:P.x,y:P.y,vx:0,vy:0,life:0.25,max:0.25,color:'#bfe3ff',r:6});
+    if(Math.random()<0.6) spawnPart(P.x,P.y,0,0,0.25,0.25,'#bfe3ff',6);
   } else {
     const spd = P.speed * (P.slowT>0 ? 0.5 : 1);   // chilled by cold zones
     P.x += mx*spd*dt; P.y += my*spd*dt;
@@ -1817,14 +1879,14 @@ function update(dt){
           if(dist2(tu.x,tu.y,e.x,e.y) < flameR*flameR){
             tu.firing = true; tu.face = Math.atan2(e.y-tu.y, e.x-tu.x);
             e.hp -= P.dmg*(P.flameDmgFrac||0.08)*dt; e.hitT=Math.max(e.hitT,0.05);
-            if(Math.random()<0.15) parts.push({x:e.x+rand(-8,8),y:e.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.35,max:0.35,color:'#ff8a3a',r:rand(2,4)});
+            if(Math.random()<0.15) spawnPart(e.x+rand(-8,8),e.y+rand(-8,8),0,-rand(20,50),0.35,0.35,'#ff8a3a',rand(2,4));
           }
         });
         for(const lb of luckies){   // flame also burns lucky blocks
           if(dist2(tu.x,tu.y,lb.x,lb.y) < flameR*flameR){
             tu.firing = true; tu.face = Math.atan2(lb.y-tu.y, lb.x-tu.x);
             lb.hp -= P.dmg*(P.flameDmgFrac||0.08)*dt; lb.hitT=0.05; lb.sq=1;
-            if(Math.random()<0.15) parts.push({x:lb.x+rand(-8,8),y:lb.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.35,max:0.35,color:'#ff8a3a',r:rand(2,4)});
+            if(Math.random()<0.15) spawnPart(lb.x+rand(-8,8),lb.y+rand(-8,8),0,-rand(20,50),0.35,0.35,'#ff8a3a',rand(2,4));
           }
         }
       }
@@ -1918,7 +1980,7 @@ function update(dt){
       P.novaCd = P.novaCdBase; shake = Math.max(shake, P.novaEvo?12:8);
       const {R,dmg} = novaStats();
       burst(P.x,P.y,'#9fd0ff',P.novaEvo?40:26,420); sfx.boss();
-      for(let k=0;k<3;k++) parts.push({x:P.x,y:P.y,vx:0,vy:0,life:0.4,max:0.4,color:'#cfeaff',r:R,ring:true});
+      for(let k=0;k<3;k++) spawnPart(P.x,P.y,0,0,0.4,0.4,'#cfeaff',R,1);
       for(const e of enemies){
         if(dist2(P.x,P.y,e.x,e.y) < R*R){
           const fb = (P.freeze && e.frz>0) ? (P.frostfire?2.2:1.6) : 1;   // Frostfire Core amps the shatter
@@ -1942,7 +2004,7 @@ function update(dt){
           else e.chillT = Math.max(e.chillT||0, 1.4);
         }
       });
-      for(let k=0;k<3;k++) parts.push({x:P.x,y:P.y,vx:0,vy:0,life:0.4,max:0.4,color:'#cfeaff',r:P.fbR,ring:true});
+      for(let k=0;k<3;k++) spawnPart(P.x,P.y,0,0,0.4,0.4,'#cfeaff',P.fbR,1);
       burst(P.x,P.y,'#bfe6ff',P.frostBloomEvo?22:14,300); sfx.boss();
     }
   }
@@ -1970,7 +2032,7 @@ function update(dt){
     forEnemiesNear(P.x,P.y,80,(e)=>{
       if(e.iv>0 || e.lead) return;
       if(dist2(P.x,P.y,e.x,e.y) < 80*80){ e.hp -= P.burnAura*dt; e.hitT=Math.max(e.hitT,0.05);
-        if(Math.random()<0.18) parts.push({x:e.x+rand(-8,8),y:e.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.4,max:0.4,color:'#ff8a3a',r:rand(2,4)}); }
+        if(Math.random()<0.18) spawnPart(e.x+rand(-8,8),e.y+rand(-8,8),0,-rand(20,50),0.4,0.4,'#ff8a3a',rand(2,4)); }
     });
   }
 
@@ -1979,7 +2041,7 @@ function update(dt){
     forEnemiesNear(P.x,P.y,P.auraR,(e)=>{
       if(e.iv>0 || e.lead) return;
       if(dist2(P.x,P.y,e.x,e.y) < P.auraR*P.auraR){ e.hp -= P.auraDmg*dt; e.hitT=Math.max(e.hitT,0.05);
-        if(Math.random()<0.1) parts.push({x:e.x+rand(-8,8),y:e.y+rand(-8,8),vx:0,vy:-rand(20,50),life:0.4,max:0.4,color:'#5fe66a',r:rand(2,4)}); }
+        if(Math.random()<0.1) spawnPart(e.x+rand(-8,8),e.y+rand(-8,8),0,-rand(20,50),0.4,0.4,'#5fe66a',rand(2,4)); }
     });
   }
 
@@ -2103,7 +2165,7 @@ function update(dt){
         const sp=Math.hypot(b.vx,b.vy), na=cur+turn; b.vx=Math.cos(na)*sp; b.vy=Math.sin(na)*sp; } }
     b.dist -= Math.hypot(b.vx,b.vy)*dt;     // range limit
     b.x+=b.vx*dt; b.y+=b.vy*dt;
-    if(b.boom){ b.spin=(b.spin||0)+dt*18; if(Math.random()<0.5) parts.push({x:b.x,y:b.y,vx:0,vy:0,life:0.18,max:0.18,color:'#7ef0a8',r:b.r*0.7}); }   // spin + green trail
+    if(b.boom){ b.spin=(b.spin||0)+dt*18; if(Math.random()<0.5) spawnPart(b.x,b.y,0,0,0.18,0.18,'#7ef0a8',b.r*0.7); }   // spin + green trail
     if(b.bounce>0){                          // Bouncy Shot: ricochet off the world walls, re-arming the hit set
       let bb=false;
       if(b.x<WALL){ b.x=WALL; b.vx=Math.abs(b.vx); bb=true; }
@@ -2155,7 +2217,7 @@ function update(dt){
           if(P.tremor && Math.random() < 0.22+P.tremor*0.05){   // Tremor Rounds: ground shock splashes nearby foes
             const R=34+P.tremor*7, sd=P.dmg*(0.3+P.tremor*0.12)*(P.abyssalMul||1);
             forEnemiesNear(b.x,b.y,R,(o)=>{ if(o===e||o.iv>0||o.under||o.lead) return; if(dist2(b.x,b.y,o.x,o.y)<R*R){ o.hp-=sd; o.hitT=Math.max(o.hitT,0.05); } });
-            parts.push({x:b.x,y:b.y,vx:0,vy:0,life:0.18,max:0.18,color:'#caa15a',r:R,ring:true,gr:R*2.4});
+            spawnPart(b.x,b.y,0,0,0.18,0.18,'#caa15a',R,1,R*2.4);
           }
           // Explosive Shot: ignite on hit, spread to nearby enemies
           if(P.chain>0 && !b.ric && !e.fire && !(e.fireImmune>0)){
@@ -2163,7 +2225,7 @@ function update(dt){
             const fireDur = P.chainEvo?5:3;
             e.fire={dur:fireDur,dmg:fireDmg,tickCd:0.5};
             burst(e.x,e.y,'#ff6a00',10,180);
-            if(P.chainNova) parts.push({x:e.x,y:e.y,vx:0,vy:0,life:0.3,max:0.3,color:'#ff6a00',r:60,ring:true,gr:320});
+            if(P.chainNova) spawnPart(e.x,e.y,0,0,0.3,0.3,'#ff6a00',60,1,320);
             const spreadN=P.chainEvo?999:P.chain-1;
             let sp=0;
             for(const o of enemies){
@@ -2254,7 +2316,7 @@ function update(dt){
         floatText(e.x,e.y-e.r-4,Math.round(e.fire.dmg),'#ff6a00',11);
         if(P.chainHeal>0) P.hp=Math.min(P.maxHp,P.hp+P.chainHeal);
       }
-      if(Math.random()<dt*10) parts.push({x:e.x+rand(-e.r*.5,e.r*.5),y:e.y-e.r*.2,vx:rand(-18,18),vy:rand(-90,-35),life:.38,max:.38,color:Math.random()<.5?'#ff6a00':'#ffcc00',r:rand(2,5)});
+      if(Math.random()<dt*10) spawnPart(e.x+rand(-e.r*.5,e.r*.5),e.y-e.r*.2,rand(-18,18),rand(-90,-35),.38,.38,Math.random()<.5?'#ff6a00':'#ffcc00',rand(2,5));
       if(e.fire.dur<=0){ e.fire=null; e.fireImmune=1; }
     }
 
@@ -2403,7 +2465,7 @@ function update(dt){
       if(P.aftershock && Math.random() < 0.12+P.aftershock*0.06){   // Aftershock: kills erupt a quake that damages nearby foes
         const R=70+P.aftershock*10, qd=P.dmg*(2+P.aftershock)*(P.abyssalMul||1);
         forEnemiesNear(e.x,e.y,R,(o)=>{ if(o.iv>0||o.under||o.lead) return; if(dist2(e.x,e.y,o.x,o.y)<R*R){ o.hp-=qd; o.hitT=Math.max(o.hitT,0.08); } });
-        parts.push({x:e.x,y:e.y,vx:0,vy:0,life:0.3,max:0.3,color:'#caa15a',r:R,ring:true,gr:R*2.5});
+        spawnPart(e.x,e.y,0,0,0.3,0.3,'#caa15a',R,1,R*2.5);
         shake=Math.max(shake,4);
       }
       if(P.vamp>0){ P.hp=Math.min(P.maxHp,P.hp+P.vamp); }
@@ -2579,16 +2641,7 @@ function update(dt){
   }
 
   // --- particles & texts ---
-  if(parts.length>MAXPARTS) parts.length=MAXPARTS;   // cap: drop newest overflow
-  { let pi=0;
-    for(let i=0;i<parts.length;i++){
-      const p=parts[i];
-      if(p.ring){ p.r+=(p.gr||600)*dt; p.life-=dt; if(p.life>0 && p.r<1400) parts[pi++]=p; continue; }
-      p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.9; p.vy*=0.9; p.life-=dt;
-      if(p.life>0) parts[pi++]=p;
-    }
-    parts.length=pi;
-  }
+  updateParts(dt);
   for(let i=texts.length-1;i>=0;i--){
     const t=texts[i]; t.x+=(t.vx||0)*dt; t.y+=t.vy*dt; t.life-=dt;
     if(t.life<=0) texts.splice(i,1);
@@ -3339,7 +3392,7 @@ function updateGimmick(e,dt){
   switch(e.gimmick){
     case 'metronome':                                   // steady off-beat ring on a quickening tempo
       e.gT-=dt; if(e.gT<=0){ e.gT = (ph>=3?1.0:ph>=2?1.3:1.6)*gm;
-        mRingGap(e,12,100,'#ffe08a',0.36); parts.push({x:e.x,y:e.y,vx:0,vy:0,life:0.3,max:0.3,color:'#ffe08a',r:e.r+8,ring:true,gr:120}); }
+        mRingGap(e,12,100,'#ffe08a',0.36); spawnPart(e.x,e.y,0,0,0.3,0.3,'#ffe08a',e.r+8,1,120); }
       break;
     case 'seedgarden':                                  // plant seeds that telegraph, then burst into a small ring
       if(!e.seeds) e.seeds=[];
@@ -3372,7 +3425,7 @@ function updateGimmick(e,dt){
     case 'centrifuge':{                                 // constant gentle drag toward the blender + periodic blade ring
       const a=Math.atan2(e.y-P.y,e.x-P.x), str=(ph>=3?70:ph>=2?52:38);
       P.x=clamp(P.x+Math.cos(a)*str*dt,WALL+P.r,WORLD.w-WALL-P.r); P.y=clamp(P.y+Math.sin(a)*str*dt,WALL+P.r,WORLD.h-WALL-P.r);
-      if(Math.random()<0.25) parts.push({x:P.x,y:P.y,vx:0,vy:0,life:0.2,max:0.2,color:'#bdbdbd',r:3});
+      if(Math.random()<0.25) spawnPart(P.x,P.y,0,0,0.2,0.2,'#bdbdbd',3);
       e.gT-=dt; if(e.gT<=0){ e.gT=(ph>=3?1.8:ph>=2?2.4:3.0)*gm;
         mRingGap(e, ph>=3?10:8, 120, '#bdbdbd', 0.35); }
       break; }
@@ -3383,13 +3436,13 @@ function updateGimmick(e,dt){
     case 'submerge':                                    // dives untargetable, slides under the player, surfaces with steam
       if(e.diving){ e.iv=Math.max(e.iv,0.2); e.stun=Math.max(e.stun||0,0.12); e.subT-=dt; const a=Math.atan2(P.y-e.y,P.x-e.x);
         e.x=clamp(e.x+Math.cos(a)*180*dt,WALL+e.r,WORLD.w-WALL-e.r); e.y=clamp(e.y+Math.sin(a)*180*dt,WALL+e.r,WORLD.h-WALL-e.r);
-        if(Math.random()<0.4) parts.push({x:e.x+rand(-10,10),y:e.y+rand(-10,10),vx:0,vy:-30,life:0.4,max:0.4,color:'#9fd0ff',r:rand(2,4)});
+        if(Math.random()<0.4) spawnPart(e.x+rand(-10,10),e.y+rand(-10,10),0,-30,0.4,0.4,'#9fd0ff',rand(2,4));
         if(e.subT<=0){ e.diving=false; burst(e.x,e.y,'#cfeaff',22,260); mRingGap(e,18,120,'#cfeaff',0.30); shake=Math.max(shake,6); } }
       else { e.gT-=dt; if(e.gT<=0 && e.mst==='recover' && e.dst==='idle' && !(e.stun>0)){ e.gT = (ph>=3?3.6:4.6)*gm; e.diving=true; e.subT=1.1; burst(e.x,e.y,'#7ec8ff',16,200); } }
       break;
     case 'coldaura':{                                   // standing near the fridge-camel chills you
       const R=ph>=3?150:128; if(dist2(e.x,e.y,P.x,P.y)<R*R){ P.slowT=Math.max(P.slowT,0.35); }
-      if(Math.random()<0.5){ const a=rand(0,TAU); parts.push({x:e.x+Math.cos(a)*R,y:e.y+Math.sin(a)*R,vx:0,vy:0,life:0.3,max:0.3,color:'#bfe6ff',r:3}); }
+      if(Math.random()<0.5){ const a=rand(0,TAU); spawnPart(e.x+Math.cos(a)*R,e.y+Math.sin(a)*R,0,0,0.3,0.3,'#bfe6ff',3); }
       break; }
     case 'blinkconjure':                                // wizard blinks about + keeps minions on the field
       e.gT-=dt; if(e.gT<=0 && e.mst==='recover' && !(e.warpT>0) && !(e.stun>0)){ e.gT = (ph>=3?3.4:4.4)*gm; e.warpT=0.45; burst(e.x,e.y,'#b388ff',16,220); }
@@ -3713,7 +3766,7 @@ function updateBoss(e,dt){
     e.charging-=dt; e.iv=Math.max(e.iv,0.2);
     e.sq=0.35+0.3*Math.sin(e.t*22);                       // throbbing wind-up
     if(Math.random()<0.7){ const a=rand(0,TAU), d=e.r*2.4;   // energy spiralling inward
-      parts.push({x:e.x+Math.cos(a)*d,y:e.y+Math.sin(a)*d,vx:-Math.cos(a)*200,vy:-Math.sin(a)*200,life:0.45,max:0.45,color:'#ff5acd',r:rand(3,6)}); }
+      spawnPart(e.x+Math.cos(a)*d,e.y+Math.sin(a)*d,-Math.cos(a)*200,-Math.sin(a)*200,0.45,0.45,'#ff5acd',rand(3,6)); }
     shake=Math.max(shake, 3 + (1-e.charging/FINAL_CHARGE)*7);
     if(e.charging<=0){                                     // UNLEASH: big opening salvo, attacks resume
       e.charging=0; burst(e.x,e.y,'#ff5acd',44,440); shake=Math.max(shake,18); sfx.boss();
@@ -3734,7 +3787,7 @@ function updateBoss(e,dt){
     if(e.dashTrail){ e.dtT=(e.dtT||0)-dt; if(e.dtT<=0){ e.dtT=0.06; const k=e.dashTrail;   // W2: charge moves leave a themed wake
       if(k.kind==='note'){ fireEB(e.x,e.y,e.da+Math.PI/2,120,k.col); fireEB(e.x,e.y,e.da-Math.PI/2,120,k.col); }
       else if(k.kind==='guac'){ addZone(e.x,e.y,42,{tele:0.25,life:1.6,dps:8,slow:true,col:k.col}); }
-      else if(k.kind==='feather'){ parts.push({x:e.x,y:e.y,vx:0,vy:0,life:0.4,max:0.4,color:k.col,r:e.r*0.7}); fireEB(e.x,e.y,e.da+Math.PI,110,k.col); } } }
+      else if(k.kind==='feather'){ spawnPart(e.x,e.y,0,0,0.4,0.4,k.col,e.r*0.7); fireEB(e.x,e.y,e.da+Math.PI,110,k.col); } } }
     if(e.ddur<=0){
       // W3: DOUBLE_DASH / STAMPEDE repeat — re-trigger a second charge immediately
       if(e.dashRepeat>0){
@@ -3803,7 +3856,7 @@ function updateBoss(e,dt){
     if(e.y<minY){ e.y=minY; e.wd.ang=-e.wd.ang; bounced=true; }
     else if(e.y>maxY){ e.y=maxY; e.wd.ang=-e.wd.ang; bounced=true; }
     if(bounced){ e.wd.n--; shake=Math.max(shake,9); sfx.hit(); burst(e.x,e.y,'#7ec8ff',16,300); mRing(e,10,150,'#7ec8ff'); }
-    e.wd.tT-=dt; if(e.wd.tT<=0){ e.wd.tT=0.04; parts.push({x:e.x,y:e.y,vx:0,vy:0,life:0.4,max:0.4,color:'#7ec8ff',r:e.r*0.85}); }
+    e.wd.tT-=dt; if(e.wd.tT<=0){ e.wd.tT=0.04; spawnPart(e.x,e.y,0,0,0.4,0.4,'#7ec8ff',e.r*0.85); }
     if(e.wd.n<=0 || e.wd.life<=0){   // done bouncing -> stand still & vulnerable for a beat
       e.wd=null; e.stun=2.6; e.mst='recover'; e.mt=2.6;
       burst(e.x,e.y,'#7ec8ff',24,260); shake=Math.max(shake,6); sfx.hit();
@@ -3859,7 +3912,7 @@ function hurtPlayer(dmg, src){
   if(P.shield>0){
     P.shield--; P.inv=0.8; P.shieldCd=P.shieldCdBase;
     sfx.dash(); burst(P.x,P.y,'#7ecbff',16,260);
-    parts.push({x:P.x,y:P.y,vx:0,vy:0,life:0.35,max:0.35,color:'#aee4ff',r:P.r+18,ring:true,gr:260});
+    spawnPart(P.x,P.y,0,0,0.35,0.35,'#aee4ff',P.r+18,1,260);
     if(P.aegisEvo){   // Aegis Fortress: blocking emits a damaging, bullet-clearing shockwave
       const R=170; shake=Math.max(shake,10);
       for(const e of enemies){ if(dist2(P.x,P.y,e.x,e.y)<R*R) damageEnemy(e,40*P.dmg,P.x,P.y,false); }
@@ -3879,7 +3932,7 @@ function hurtPlayer(dmg, src){
       P.hp=Math.max(1,Math.round(P.maxHp*P.phoenixHeal)); P.inv=2;
       bigText('REBORN','#ff7a3a'); shake=Math.max(shake,16);
       const R=P.phoenixEvo?320:230; burst(P.x,P.y,'#ff7a3a',46,440); sfx.win();
-      parts.push({x:P.x,y:P.y,vx:0,vy:0,life:0.5,max:0.5,color:'#ffd0a0',r:R,ring:true,gr:520});
+      spawnPart(P.x,P.y,0,0,0.5,0.5,'#ffd0a0',R,1,520);
       for(const e of enemies){ if(dist2(P.x,P.y,e.x,e.y)<R*R) damageEnemy(e,(P.phoenixEvo?80:50)*P.dmg,P.x,P.y,false); }
       ebullets = ebullets.filter(b=>dist2(P.x,P.y,b.x,b.y)>R*R);
       return;
@@ -4363,14 +4416,7 @@ function render(){
   }
 
   // --- particles ---
-  for(const p of parts){
-    if(p.x<vx0-p.r-4||p.x>vx1+p.r+4||p.y<vy0-p.r-4||p.y>vy1+p.r+4) continue;
-    const a = Math.max(0, p.life/p.max);
-    if(p.ring){ cx.globalAlpha=a*0.6; cx.strokeStyle=p.color; cx.lineWidth=(p.lw||5)*a+1; cx.beginPath(); cx.arc(p.x,p.y,p.r,0,TAU); cx.stroke(); continue; }
-    cx.globalAlpha = a; cx.fillStyle = p.color;
-    cx.beginPath(); cx.arc(p.x, p.y, p.r*(0.45+0.55*a), 0, TAU); cx.fill();
-  }
-  cx.globalAlpha=1;
+  renderParts(vx0,vy0,vx1,vy1);
 
   // --- floating text ---
   cx.textAlign='center';
@@ -4823,7 +4869,7 @@ function resumeGame(){ if(state!==ST.PAUSE) return; state=ST.PLAY; $('pause').cl
 function togglePause(){ if(state===ST.PLAY) pauseGame(); else if(state===ST.PAUSE) resumeGame(); }
 function quitToMenu(){
   state=ST.MENU; arena=null; bossPending=0; boss=null;
-  bullets=[]; ebullets=[]; petBullets=[]; enemies=[]; gems=[]; parts=[]; texts=[]; zones=[]; holes=[]; luckies=[];
+  bullets=[]; ebullets=[]; petBullets=[]; enemies=[]; gems=[]; texts=[]; zones=[]; holes=[]; luckies=[]; clearParts();
   resetPlayer(); computeCamera();
   $('pause').classList.add('hidden');
   $('hud').classList.add('hidden');
