@@ -3859,21 +3859,25 @@ function hurtPlayer(dmg, src){
 
 // ============ RENDER ============
 const TILE = 80;
+const _sortByY = (a,b) => a.y - b.y;
 function drawSprite(name, x, y, size, rot, sq, hitT, flip, tint){
   const img = SP[name]; if(!img) return;
+  const dsz = img._nom ? size * img.width / img._nom : size;
+  const drawImg = (tint && tintedSprite(name,tint)) || img;
+  const half = dsz * 0.5;
+  // fast path: no rotation, no squash, no flip — skip save/restore entirely (majority of calls)
+  if(!rot && !(sq>0) && !flip){
+    cx.drawImage(drawImg, x-half, y-half, dsz, dsz);
+    if(hitT>0.012){ cx.globalAlpha=Math.min(1,hitT/0.12); cx.drawImage(SPW[name], x-half, y-half, dsz, dsz); cx.globalAlpha=1; }
+    return;
+  }
   cx.save();
   cx.translate(x,y);
   if(rot) cx.rotate(rot);
   if(flip) cx.scale(-1,1);
-  // squash & stretch
-  let sxk=1, syk=1;
-  if(sq>0){ const k=Math.sin(sq*Math.PI)*0.22; sxk=1+k; syk=1-k; }
-  cx.scale(sxk,syk);
-  // compensate for canvas padding added in makeSprite (img._nom stores nominal pre-pad size)
-  const dsz = img._nom ? size * img.width / img._nom : size;
-  const drawImg = (tint && tintedSprite(name,tint)) || img;
-  cx.drawImage(drawImg, -dsz/2, -dsz/2, dsz, dsz);
-  if(hitT>0.012){ cx.globalAlpha=Math.min(1,hitT/0.12); cx.drawImage(SPW[name], -dsz/2, -dsz/2, dsz, dsz); cx.globalAlpha=1; }   // skip the imperceptible tail of the flash to save a full extra drawImage
+  if(sq>0){ const k=Math.sin(sq*Math.PI)*0.22; cx.scale(1+k, 1-k); }
+  cx.drawImage(drawImg, -half, -half, dsz, dsz);
+  if(hitT>0.012){ cx.globalAlpha=Math.min(1,hitT/0.12); cx.drawImage(SPW[name], -half, -half, dsz, dsz); cx.globalAlpha=1; }
   cx.restore();
 }
 
@@ -4070,7 +4074,6 @@ function render(){
   const bcore = P.railgun ? '#5fe6ff' : P.soldierBullets ? '#1a1a22' : P.whiteBullets ? '#ffffff' : '#ffd21f';
   const bhi   = P.railgun ? '#dafcff' : P.soldierBullets ? '#44444e' : P.whiteBullets ? '#bcdcff' : '#fff6bf';
   if(P.ghostBullets) cx.globalAlpha=0.6;
-  // draw special bullets first (per-bullet), then batch plain bullets in 3 passes
   for(const b of bullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     if(b.boom){ drawBoomerangCroc(b); continue; }
@@ -4078,20 +4081,12 @@ function render(){
     if(b.lucky){
       if(b.luckyCrit){ cx.filter='grayscale(1) contrast(1.1)'; drawSprite('luckyblock',b.x,b.y,b.r*7,0,0,0,false,null); cx.filter='none'; }
       else drawSprite('luckyblock',b.x,b.y,b.r*5,0,0,0,false,null);
+      continue;
     }
+    cx.fillStyle='#fff'; cx.beginPath(); cx.arc(b.x,b.y,b.r+2,0,TAU); cx.fill();
+    cx.fillStyle=bcore; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
+    cx.fillStyle=bhi; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.4,0,TAU); cx.fill();
   }
-  // rim pass
-  cx.fillStyle='#fff'; cx.beginPath();
-  for(const b of bullets){ if(b.boom||b.knife||b.lucky) continue; if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue; cx.moveTo(b.x+b.r+2,b.y); cx.arc(b.x,b.y,b.r+2,0,TAU); }
-  cx.fill();
-  // core pass
-  cx.fillStyle=bcore; cx.beginPath();
-  for(const b of bullets){ if(b.boom||b.knife||b.lucky) continue; if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue; cx.moveTo(b.x+b.r,b.y); cx.arc(b.x,b.y,b.r,0,TAU); }
-  cx.fill();
-  // highlight pass
-  cx.fillStyle=bhi; cx.beginPath();
-  for(const b of bullets){ if(b.boom||b.knife||b.lucky) continue; if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue; const hx2=b.x-b.r*0.3,hy2=b.y-b.r*0.3,hr=b.r*0.4; cx.moveTo(hx2+hr,hy2); cx.arc(hx2,hy2,hr,0,TAU); }
-  cx.fill();
   if(P.ghostBullets) cx.globalAlpha=1;
 
   // --- pet bullets: small cyan dot ---
@@ -4121,7 +4116,7 @@ function render(){
   // --- enemies (sorted by y for depth) ---
   _vis.length=0;   // reuse a scratch array instead of allocating filter()+sort() every frame
   for(const e of enemies){ if(e.x>vx0-60&&e.x<vx1+60&&e.y>vy0-60&&e.y<vy1+60) _vis.push(e); }
-  _vis.sort((a,b)=>a.y-b.y);
+  _vis.sort(_sortByY);
   // idle sprite wobble forces every drawImage onto canvas's slower rotated-blit path (any non-zero
   // rotation does); skip it once there are enough visible enemies that the blit cost actually matters
   const skipWob = _vis.length > 40;
