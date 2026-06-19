@@ -1666,9 +1666,8 @@ function openLevelUp(){
       });
       setTimeout(()=>{
         $('levelup').classList.add('hidden');
-        tPrev=performance.now();
         state=ST.PLAY;
-      }, 440);
+      }, 220);
     };
     wrap.appendChild(d);
   });
