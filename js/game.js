@@ -13,7 +13,13 @@ let placedTurrets=[];  // Engineer "place turret" (replaces dash): stationary, d
 let timeScale=1.0;
 let _vis=[];   // reused per-frame scratch list of visible enemies (depth sort) — avoids GC churn
 let wave=1, kills=0, spawnTimer=0, waveEnemiesLeft=0, betweenWaves=false, boss=null;
-let worldCoins=0;   // coins collected during the CURRENT world run (in-game HUD display; total still banked in `gold`)
+let worldCoins=0;
+// ---- CHAOS EVENTS ----
+let chaosSchedule=[],chaosWaveIdx=0,chaosMidTimer=-1;
+let chaosAnnounceT=0,_chaosQueuedFn=null;
+let chaosSpeedT=0,chaosBlackoutT=0,chaosGiantN=0;
+let chaosGravT=0; // >0=scatter away, <0=rush toward player
+let chaosShrinkT=0;   // coins collected during the CURRENT world run (in-game HUD display; total still banked in `gold`)
 let _lastSec=-1;    // throttles the survival-timer DOM update to once per second
 const MMH = window.MINIMAP_HELPERS;
 // ===== CHALLENGER MODE STATE =====
@@ -1255,6 +1261,7 @@ function _doStartGame(wi){
   timeScale=1.0;
   bullets=[]; ebullets=[]; petBullets=[]; enemies=[]; gems=[]; texts=[]; zones=[]; holes=[]; luckies=[]; clearParts();
   wave=1; kills=0; elapsed=0; boss=null; waveGapT=0; arena=null; bossPending=0;
+  scheduleChaos();
   luckyTimer=rand(10,18);
   worldCoins=0;
   chalElapsed=0; chalBossIdx=0; chalBossActive=false; chalLuckyT=5;
@@ -1275,8 +1282,12 @@ function startWave(){
   betweenWaves=false;
   $('wavetag').textContent = 'WAVE '+wave;
   if(typeof fireHook==='function') fireHook('waveStart');
-  if(wave % 5 === 0){ startBossArena(); waveEnemiesLeft = 0; }
-  else { waveEnemiesLeft = Math.max(6, Math.round((16 + wave*5.5) * (curWorld().enemyMul||1) * (wave<=9?1.3:1))); spawnTimer = 0; sfx.wave();
+  if(wave%5===0){ startBossArena(); waveEnemiesLeft=0; }
+  else { waveEnemiesLeft=Math.max(6,Math.round((16+wave*5.5)*(curWorld().enemyMul||1)*(wave<=9?1.3:1))); spawnTimer=0; sfx.wave();
+    // schedule chaos mid-wave if this wave is a chaos wave
+    if(!timerMode()&&chaosWaveIdx<chaosSchedule.length&&wave===chaosSchedule[chaosWaveIdx]){
+      chaosMidTimer=rand(8,20); chaosWaveIdx++;
+    }
     const luckyCap = Math.max(2, ...(typeof queryHook==='function' ? queryHook('getLuckyCap') : [2]));
     spawnLuckyBatch(luckyCap);
   }
@@ -1424,6 +1435,119 @@ function spawnBoss(){
   setTimeout(()=>bw.classList.add('hidden'), 1700);
 }
 
+// ============ CHAOS EVENT SYSTEM ============
+function scheduleChaos(){
+  chaosSchedule=[
+    1+Math.floor(Math.random()*4),
+    6+Math.floor(Math.random()*4),
+    11+Math.floor(Math.random()*4),
+    16+Math.floor(Math.random()*4),
+  ];
+  chaosWaveIdx=0; chaosMidTimer=-1; chaosAnnounceT=0; _chaosQueuedFn=null;
+  chaosSpeedT=0; chaosBlackoutT=0; chaosGiantN=0; chaosGravT=0; chaosShrinkT=0;
+  const el=$('chaos-announce'); if(el) el.classList.add('hidden');
+}
+
+function _chaosBulletStorm(){
+  const vw=W/zoom,vh=H/zoom,cx0=camera.x,cy0=camera.y;
+  for(let i=0;i<60;i++){
+    let bx,by; const edge=Math.floor(Math.random()*4);
+    if(edge===0){bx=cx0+rand(0,vw);by=cy0;}
+    else if(edge===1){bx=cx0+rand(0,vw);by=cy0+vh;}
+    else if(edge===2){bx=cx0;by=cy0+rand(0,vh);}
+    else{bx=cx0+vw;by=cy0+rand(0,vh);}
+    fireEB(bx,by,Math.atan2(P.y-by,P.x-bx)+rand(-0.5,0.5),rand(150,230),'#ff44aa',{dmgMul:0.65});
+  }
+}
+
+function _chaosCloneWar(){
+  const src=enemies.filter(e=>!e.isBoss&&!e.chaosClone);
+  let n=0,cap=Math.min(src.length,Math.floor(MAX_ENEMIES/4));
+  for(const e of src){
+    if(n>=cap||enemies.length>=MAX_ENEMIES-2) break;
+    const a=rand(0,TAU),rd=rand(25,55);
+    const clone=Object.assign({},e,{x:clamp(e.x+Math.cos(a)*rd,WALL,WORLD.w-WALL),y:clamp(e.y+Math.sin(a)*rd,WALL,WORLD.h-WALL),hp:e.maxHp*0.5,iv:0.8,frz:0,fire:null,chaosClone:true,t:rand(0,TAU)});
+    enemies.push(clone); n++;
+  }
+}
+
+function _chaosBossCrash(){
+  if(boss) return;
+  const others=WORLDS.filter(w=>w.bosses&&w.bosses.length>0&&w!==curWorld());
+  if(!others.length) return;
+  const def=pick(pick(others).bosses.slice(0,-1)||pick(others).bosses);
+  const hp=def.hp*HP_MULT*(1+(wave-1)*0.10)*(curWorld().hpMul||1)*(1+worldBand()*0.42)*0.38;
+  const p=ringPos();
+  boss={
+    spr:def.spr,name:'INVADER: '+def.name,pattern:def.pattern,mk:def.moveKey||def.spr,
+    phased:false,bars:1,bar1:hp,bar2:0,
+    finalPhase:false,ph2at:0,ph3at:0,charging:0,
+    gimmick:GIMMICK[def.moveKey||def.spr]||null,gT:2,gT2:3,gA:0,
+    x:p.x,y:p.y,r:def.r,hp,maxHp:hp,
+    t:0,phase:0,isBoss:true,sp:48,xp:0,score:300,hitT:0,sq:0,
+    mst:'recover',mt:1.5,mv:null,lastMv:null,vph:1,pull:0,spin:0,dst:'idle',iv:0.5,
+    rollSpray:0,warpT:0,wd:null,gsweep:null,carpet:0,cbT:0,tether:0,
+    chaosInvader:true
+  };
+  enemies.push(boss);
+  $('bossname').textContent=boss.name;
+  $('bossfill').style.width='100%'; $('bossfill').style.background='#e88830';
+  $('bossfill2').style.width='0%'; $('bossbar2').classList.add('hidden');
+  $('bossbar').classList.remove('hidden');
+  const bw=$('bosswarn'); bw.textContent='INVADER!'; bw.classList.remove('hidden');
+  setTimeout(()=>bw.classList.add('hidden'),1700);
+  sfx.boss();
+}
+
+const CHAOS_EVENTS=[
+  {name:'CLONE WAR',   col:'#ff88ff', fn:()=>_chaosCloneWar()},
+  {name:'SPEED SURGE', col:'#ffdd00', fn:()=>{chaosSpeedT=8;}},
+  {name:'BULLET STORM',col:'#ff4488', fn:()=>_chaosBulletStorm()},
+  {name:'GIANT',       col:'#ff8800', fn:()=>{chaosGiantN=6;}},
+  {name:'BLACKOUT',    col:'#8888ff', fn:()=>{chaosBlackoutT=6;}},
+  {name:'BOSS CRASH',  col:'#ff3333', fn:()=>_chaosBossCrash()},
+  {name:'GRAVITY',     col:'#44ffcc', fn:()=>{chaosGravT=3;}},
+  {name:'FREEZE',      col:'#aaeeff', fn:()=>{for(const e of enemies){if(!e.isBoss)e.frz=Math.max(e.frz,3);}}},
+  {name:'SWARM',       col:'#aaff44', fn:()=>{ let n=18;while(n-->0&&enemies.length<MAX_ENEMIES-1){const p=ringPos(),f=curFoes[0];enemies.push({spr:f.spr,name:f.name,x:p.x,y:p.y,r:f.r*0.65,hp:f.hp*HP_MULT*0.28,maxHp:f.hp*HP_MULT*0.28,_shooter:false,_hazard:false,_burst:false,dmgBuff:0.5,sp:f.sp*1.8,xp:f.xp*0.25,score:8,range:0,shoot:null,death:null,aoe:null,aoeCd:3,dash:false,dst:'idle',dcd:2,da:0,dwin:0,ddur:0,shell:false,shellCd:5,iv:0.25,support:null,supCd:3,front:0,kb:0,pullAura:0,trail:null,trailT:0,cast:null,castCd:0,under:false,digT:0,spin:0,t:rand(0,TAU),wob:rand(2,4),shootCd:3,frz:0,isBoss:false,hitT:0,sq:0,face:1,chaosSwarm:true});}}},
+  {name:'MAGNET PULL', col:'#ffcc00', fn:()=>{for(const g of gems){g._chaosMag=true;}}},
+];
+
+function fireChaosEvent(){
+  const ev=pick(CHAOS_EVENTS);
+  chaosAnnounceT=1.8;
+  _chaosQueuedFn=ev.fn;
+  const el=$('chaos-announce');
+  if(el){ el.textContent='⚡ '+ev.name+' ⚡'; el.style.color=ev.col; el.classList.remove('hidden'); }
+}
+
+function updateChaos(dt){
+  if(state!==ST.PLAY||betweenWaves) return;
+  if(chaosMidTimer>0){ chaosMidTimer-=dt; if(chaosMidTimer<=0){chaosMidTimer=0;fireChaosEvent();} }
+  if(chaosAnnounceT>0){
+    chaosAnnounceT-=dt;
+    if(chaosAnnounceT<=0){
+      chaosAnnounceT=0;
+      if(_chaosQueuedFn){_chaosQueuedFn();_chaosQueuedFn=null;}
+      const el=$('chaos-announce'); if(el) el.classList.add('hidden');
+    }
+  }
+  if(chaosSpeedT>0){chaosSpeedT-=dt;if(chaosSpeedT<0)chaosSpeedT=0;}
+  if(chaosBlackoutT>0){chaosBlackoutT-=dt;if(chaosBlackoutT<0)chaosBlackoutT=0;}
+  if(chaosGravT>0){ chaosGravT-=dt; if(chaosGravT<=0) chaosGravT=-2.5; }
+  else if(chaosGravT<0){ chaosGravT+=dt; if(chaosGravT>=0) chaosGravT=0; }
+  if(chaosShrinkT>0){
+    chaosShrinkT-=dt;
+    if(chaosShrinkT<=0){chaosShrinkT=0;for(const e of enemies){if(e._chaosShrunk){e._chaosShrunk=false;e.r*=2;e.sp*=0.5;}}}
+  }
+  // magnet chaos — pull flagged gems toward player
+  for(const g of gems){
+    if(g._chaosMag){
+      const dx=P.x-g.x,dy=P.y-g.y,d=Math.hypot(dx,dy);
+      if(d>20){g.vx+=dx/d*2200*dt;g.vy+=dy/d*2200*dt;}else{g._chaosMag=false;}
+    }
+  }
+}
+
 // returns false when the global cap is hit (so the caller keeps the wave's spawn budget for later)
 function spawnEnemy(){
   const eCap = timerMode() ? (IS_TOUCH ? 90 : 150) : MAX_ENEMIES;
@@ -1467,6 +1591,10 @@ function spawnEnemy(){
     under: !!def.burrow, digT: def.burrow ? rand(0.7,1.3) : 0, spin:0,
     t:rand(0,TAU), wob:rand(2,4), shootCd:rand(1.5,4), frz:0, isBoss:false, hitT:0, sq:0, face:1
   });
+  if(chaosGiantN>0){
+    const ne=enemies[enemies.length-1];
+    ne.r*=3; ne.hp*=8; ne.maxHp=ne.hp; ne.sp*=0.7; chaosGiantN--;
+  }
 }
 
 // ============ FX ============
@@ -2308,6 +2436,9 @@ function update(dt){
     pb.tx=pb.target.x; pb.ty=pb.target.y;   // track moving target
   }
 
+  // --- chaos events ---
+  updateChaos(dt);
+
   // --- spawn during wave ---
   spawnTimer -= dt;
   if(!betweenWaves && waveEnemiesLeft>0 && spawnTimer<=0){
@@ -2392,7 +2523,8 @@ function update(dt){
             else if(e.shoot && e.shoot.move){ a = toP + Math.PI/2; } // in range + mobile: strafe
             else { move=false; }                                  // in range + stationary: hold
           }
-          if(move){ e.x += Math.cos(a)*e.sp*fs*dt; e.y += Math.sin(a)*e.sp*fs*dt; }
+          const cSpd=chaosSpeedT>0?2:1;
+          if(move){ e.x += Math.cos(a)*e.sp*fs*cSpd*dt; e.y += Math.sin(a)*e.sp*fs*cSpd*dt; }
           e.face = Math.cos(toP)>=0 ? 1 : -1;
           e.moving = move;
         } else {
@@ -2408,6 +2540,13 @@ function update(dt){
       separate(e);   // resolve overlaps with nearby foes so the pack spreads + flows around
       e.x = clamp(e.x, WALL, WORLD.w-WALL); e.y = clamp(e.y, WALL, WORLD.h-WALL);
       if(arena){ e.x=clamp(e.x, arena.x+e.r, arena.x+arena.w-e.r); e.y=clamp(e.y, arena.y+e.r, arena.y+arena.h-e.r); }
+      // chaos gravity: scatter away (>0) or rush in (<0)
+      if(chaosGravT!==0&&e.iv<=0){
+        const ga=chaosGravT>0?Math.atan2(e.y-P.y,e.x-P.x):Math.atan2(P.y-e.y,P.x-e.x);
+        const gs=chaosGravT>0?270:420;
+        e.x=clamp(e.x+Math.cos(ga)*gs*dt,WALL,WORLD.w-WALL);
+        e.y=clamp(e.y+Math.sin(ga)*gs*dt,WALL,WORLD.h-WALL);
+      }
       if(wave>=3 && e.iv<=0 && awake){
         if(e.shoot && (!e.range || dist2(e.x,e.y,P.x,P.y) <= e.range*e.range)){
           e.shootCd -= dt;
@@ -2530,6 +2669,13 @@ function update(dt){
         $('bossbar').classList.add('hidden');
         ebullets=[];
         worldCleared(e);            // cutscene path (later task); skip normal drops/reopen
+      } else if(e.isBoss && e.chaosInvader){
+        boss=null; $('bossbar').classList.add('hidden');
+        playMusic(curTheme.music); sfx.win();
+        bigText('INVADER SLAIN!','#e88830');
+        for(let g=0;g<6;g++) dropOrb(e.x,e.y,3,120,300);
+        const ca=rand(0,TAU); gems.push({x:e.x,y:e.y,coin:true,t:0,vx:Math.cos(ca)*200,vy:Math.sin(ca)*200});
+        ebullets=[]; zones=[];
       } else if(e.isBoss){
         boss=null; arena=null;       // open the field back up
         $('bossbar').classList.add('hidden');
@@ -4557,6 +4703,18 @@ function render(){
   renderArena(vx0,vy0,vx1,vy1);
 
   cx.restore(); // back to screen space
+
+  // chaos blackout: dark overlay with hole around player (player is always screen-center)
+  if(chaosBlackoutT>0&&state===ST.PLAY){
+    const sx=W/2,sy=H/2,rad=130+chaosBlackoutT*4;
+    cx.save();
+    cx.fillStyle='rgba(0,0,0,0.93)';
+    cx.beginPath(); cx.rect(0,0,W,H); cx.arc(sx,sy,rad,0,TAU,true); cx.fill('evenodd');
+    const fade=cx.createRadialGradient(sx,sy,rad*0.55,sx,sy,rad);
+    fade.addColorStop(0,'rgba(0,0,0,0)'); fade.addColorStop(1,'rgba(0,0,0,0.88)');
+    cx.fillStyle=fade; cx.beginPath(); cx.arc(sx,sy,rad,0,TAU); cx.fill();
+    cx.restore();
+  }
 
   // depth edge-darkening (theme vignette, e.g. DIRT DEPTHS)
   if(curTheme.edgeDark>0 && state!==ST.MENU){
