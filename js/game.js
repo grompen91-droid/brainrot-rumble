@@ -4125,9 +4125,9 @@ function render(){
   // idle sprite wobble forces every drawImage onto canvas's slower rotated-blit path (any non-zero
   // rotation does); skip it once there are enough visible enemies that the blit cost actually matters
   const skipWob = _vis.length > 40;
-  // batch all enemy shadows in one fill call
+  // batch all enemy shadows in one fill call (moveTo before each ellipse to avoid connecting subpaths)
   cx.fillStyle='rgba(40,60,25,0.28)'; cx.beginPath();
-  for(const e of _vis){ if(!e.under) cx.ellipse(e.x, e.y+e.r*0.85, e.r*0.8, e.r*0.32, 0,0,TAU); }
+  for(const e of _vis){ if(!e.under){ const sy=e.y+e.r*0.85; cx.moveTo(e.x+e.r*0.8,sy); cx.ellipse(e.x,sy,e.r*0.8,e.r*0.32,0,0,TAU); } }
   cx.fill();
   for(const e of _vis){
     if(e.under){   // burrowed: just a heaving dirt mound that tracks the player
