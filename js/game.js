@@ -22,12 +22,12 @@ let chalElapsed = 0;        // challenger timer — pauses during boss fights
 let chalBossIdx = 0;        // index of next boss milestone (0-3 → 5/10/15/20 min)
 let chalBossActive = false; // true while a challenger boss is alive
 let chalLuckyT = 0;         // countdown to next lucky block batch in challenger
-const CHAL_BOSS_TIMES = [300, 600, 900, 1200];  // seconds: 5/10/15/20 min
-// Challenger World 3 only: middle boss cut, run shortened to 15 min — first boss, third boss, final boss.
-const CHAL_BOSS_TIMES_W3 = [300, 600, 900];     // seconds: 5/10/15 min
-const CHAL_BOSS_MAP_W3 = [0, 2, 3];             // milestone idx → curBosses index (skips index 1, the middle boss)
-function chalIsW3(){ return gameMode==='challenger' && worldIdx===2; }
-function curChalBossTimes(){ return chalIsW3() ? CHAL_BOSS_TIMES_W3 : CHAL_BOSS_TIMES; }
+const CHAL_BOSS_TIMES = [300, 600, 900, 1200];  // seconds: 5/10/15/20 min (story mode uses this 4-boss schedule)
+// Every challenger world: middle boss cut, run shortened to 15 min — first boss, third boss, final boss.
+const CHAL_BOSS_TIMES_CHAL = [300, 600, 900];   // seconds: 5/10/15 min
+const CHAL_BOSS_MAP_CHAL = [0, 2, 3];           // milestone idx → curBosses index (skips index 1, the middle boss)
+function chalIsShort(){ return gameMode==='challenger'; }
+function curChalBossTimes(){ return chalIsShort() ? CHAL_BOSS_TIMES_CHAL : CHAL_BOSS_TIMES; }
 
 // ===== PRACTICE MODE STATE =====
 // Sandbox gamemode: no rewards, single customizable "world", reuses the challenger
@@ -1292,7 +1292,7 @@ function ringPos(){ // spawn point on a ring around player, clamped to world
 function spawnBoss(){
   const milestoneIdx = ((Math.floor(wave/5)-1) % curBosses.length + curBosses.length) % curBosses.length;
   // Challenger World 3: middle boss is cut, so milestone 0/1/2 map to boss species 0/2/3 instead of 0/1/2.
-  const bossIdx = chalIsW3() ? (CHAL_BOSS_MAP_W3[milestoneIdx] ?? milestoneIdx) : milestoneIdx;
+  const bossIdx = chalIsShort() ? (CHAL_BOSS_MAP_CHAL[milestoneIdx] ?? milestoneIdx) : milestoneIdx;
   const def = gameMode==='practice'
     ? curBosses[Math.floor(Math.random()*curBosses.length)]
     : curBosses[bossIdx];
