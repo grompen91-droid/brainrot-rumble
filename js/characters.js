@@ -632,7 +632,8 @@ function _playerAnim() {
   }
   const hitPulse = P.hitT>0 ? P.hitT/0.25 : 0;
   const t = typeof elapsed!=='undefined' ? elapsed : 0;
-  return { walkPhase:P.walk||0, moving:!!P.moving, walkAmt:P.walkAmt||0, firePulse, hitPulse, t };
+  const faceX = P.face!=null ? Math.cos(P.face) : 1;   // horizontal travel dir (-1 left .. +1 right) for the directional lean
+  return { walkPhase:P.walk||0, moving:!!P.moving, walkAmt:P.walkAmt||0, faceX, firePulse, hitPulse, t };
 }
 
 function drawCharacter(charId, x, y, size, bob, flip) {
@@ -647,7 +648,11 @@ function drawCharacter(charId, x, y, size, bob, flip) {
   ctx.save();
   ctx.translate(x,y);
   if(flip) ctx.scale(-1,1);
-  ctx.rotate(bob||0);
+  // directional lean: tip the whole character toward the way it's moving so left/right walks read
+  // differently (front-facing art is symmetric, so the flip alone is invisible). Computed in screen
+  // space then un-mirrored, so the lean always tips toward travel regardless of flip.
+  const screenLean = (anim.faceX||0) * 0.16 * (anim.walkAmt||0);
+  ctx.rotate((bob||0) + (flip ? -screenLean : screenLean));
   const elapsed_ = typeof elapsed!=='undefined' ? elapsed : 0;
   char.draw(ctx, size, elapsed_, anim);
   ctx.restore();
