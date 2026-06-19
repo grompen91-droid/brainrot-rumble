@@ -759,8 +759,8 @@ function drawWorldEmblemBase(g,w,sz){
   for(let y=0;y<sz;y+=T) for(let x=0;x<sz;x+=T) if(((x/T+y/T)&1)) g.fillRect(x,y,T,T);
   const bdef = w.bosses[w.bosses.length-1];                           // headliner = the world's end-boss
   const spr = bdef && SP[bdef.spr];
-  if(spr){ const pad=spr._nom?spr.width/spr._nom:1, s=sz*0.72*pad, im=(w.enemyTint && tintedSprite(bdef.spr,w.enemyTint))||spr;
-    g.drawImage(im, (sz-s)/2, (sz-s)/2+8, s, s); }
+  if(spr){ const pad=spr._nom?spr.width/spr._nom:1, s=sz*0.72*pad;
+    g.drawImage(spr, (sz-s)/2, (sz-s)/2+8, s, s); }
 }
 const _emblemURL = {};
 function worldEmblemURL(i){
