@@ -2771,35 +2771,171 @@ function bossMoves(e){
       if(e.vph>=3) return ['CONFETTI_SPIRAL','BALLOON_RING','SUMMON_ACT','CONFETTI_SPIRAL'];
       if(e.vph>=2) return ['BALLOON_RING','CONFETTI_SPIRAL','SUMMON_ACT'];
       return ['BALLOON_RING','SUMMON_ACT'];
-    // ---- World 2 (DIRT DEPTHS) ----
-    case 'tatasahur':                      // burrow-slam + marching drum beat
+    // ---- Worlds 6-10 (shared BOSSES_DIRT roster, world-aware attacks) ----
+    case 'tatasahur': {                    // burrow-slam drummer — adapts to world terrain
+      const wid=curWorld().id;
+      if(wid==='swamp'){
+        if(e.vph>=3) return ['SWAMP_FLOOD','DRUM_MARCH','BURROW_DOUBLE','aimed5','AIMED_WALL'];
+        if(e.vph>=2) return ['SWAMP_FLOOD','DRUM_MARCH','BURROW_SLAM','ring2'];
+        return ['BURROW_SLAM','SWAMP_FLOOD','aimed3'];
+      } if(wid==='sky'){
+        if(e.vph>=3) return ['SKY_PLUNGE','DRUM_MARCH','BURROW_DOUBLE','RING_VOLLEY','aimed5'];
+        if(e.vph>=2) return ['SKY_PLUNGE','DRUM_MARCH','BURROW_SLAM','ring2'];
+        return ['BURROW_SLAM','SKY_PLUNGE','ring16'];
+      } if(wid==='crystal'){
+        if(e.vph>=3) return ['CRYSTAL_SPIKE','DRUM_MARCH','BURROW_DOUBLE','PRISM_SPLIT','aimed5'];
+        if(e.vph>=2) return ['CRYSTAL_SPIKE','DRUM_MARCH','BURROW_SLAM','ring12'];
+        return ['BURROW_SLAM','CRYSTAL_SPIKE','aimed3'];
+      } if(wid==='volcano'){
+        if(e.vph>=3) return ['ERUPTION','DRUM_MARCH','BURROW_DOUBLE','QUAKE_RADIAL','aimed5'];
+        if(e.vph>=2) return ['ERUPTION','DRUM_MARCH','BURROW_SLAM','LAVA_POOL'];
+        return ['BURROW_SLAM','ERUPTION','aimed3'];
+      }
+      // dirt (default)
       if(e.vph>=3) return ['DRUM_MARCH','BURROW_DOUBLE','DEBRIS3','aimed5','AIMED_WALL'];
       if(e.vph>=2) return ['DRUM_MARCH','BURROW_SLAM','DEBRIS3','ring2'];
       return ['BURROW_SLAM','aimed3','ring16'];
-    case 'hotspot':                        // geyser ground-denial + rotating sweep
+    }
+    case 'hotspot': {                      // geyser ground-denial — world-themed hazards
+      const wid=curWorld().id;
+      if(wid==='swamp'){
+        if(e.vph>=3) return ['SWAMP_FLOOD','GEYSER_SWEEP','SPORE_FIELD','RING_VOLLEY'];
+        if(e.vph>=2) return ['SWAMP_FLOOD','GEYSER_SWEEP','aimed5','EXPAND_IMPLODE'];
+        return ['SWAMP_FLOOD','slam','ring16'];
+      } if(wid==='sky'){
+        if(e.vph>=3) return ['SKY_PLUNGE','GEYSER_SWEEP','EXPAND_IMPLODE','RING_VOLLEY'];
+        if(e.vph>=2) return ['SKY_PLUNGE','GEYSER_SWEEP','aimed5','ring2'];
+        return ['SKY_PLUNGE','slam','ring16'];
+      } if(wid==='crystal'){
+        if(e.vph>=3) return ['CRYSTAL_SPIKE','GEYSER_SWEEP','PRISM_SPLIT','SPIRAL_STORM'];
+        if(e.vph>=2) return ['CRYSTAL_SPIKE','GEYSER_SWEEP','QUAKE_CROSS','aimed5'];
+        return ['CRYSTAL_SPIKE','slam','ring16'];
+      } if(wid==='volcano'){
+        if(e.vph>=3) return ['ERUPTION','GEYSER_SWEEP','QUAKE_RADIAL','RING_VOLLEY'];
+        if(e.vph>=2) return ['ERUPTION','GEYSER_SWEEP','LAVA_POOL','aimed5'];
+        return ['LAVA_POOL','slam','ring16'];
+      }
       if(e.vph>=3) return ['GEYSER_SWEEP','QUAKE_RADIAL','dblslam','RING_VOLLEY'];
       if(e.vph>=2) return ['GEYSER_SWEEP','QUAKE_CROSS','aimed5','SPIRAL_STORM'];
       return ['QUAKE_LINE','slam','ring16'];
-    case 'saturnita':                      // lava floor + Saturn orbital rings
+    }
+    case 'saturnita': {                    // saturn orbital rings — world-coloured hazards
+      const wid=curWorld().id;
+      if(wid==='swamp'){
+        if(e.vph>=3) return ['SATURN_RING','SWAMP_FLOOD','EXPAND_IMPLODE','SPIRAL_STORM'];
+        if(e.vph>=2) return ['SATURN_RING','SWAMP_FLOOD','SPORE_FIELD','aimed5'];
+        return ['SWAMP_FLOOD','ring16','aimed3'];
+      } if(wid==='sky'){
+        if(e.vph>=3) return ['SATURN_RING','SKY_PLUNGE','EXPAND_IMPLODE','SPIRAL_STORM'];
+        if(e.vph>=2) return ['SATURN_RING','SKY_PLUNGE','ring2','aimed5'];
+        return ['SKY_PLUNGE','ring16','aimed3'];
+      } if(wid==='crystal'){
+        if(e.vph>=3) return ['SATURN_RING','CRYSTAL_SPIKE','PRISM_SPLIT','TWIN_STORM'];
+        if(e.vph>=2) return ['SATURN_RING','CRYSTAL_SPIKE','SWEEP','aimed5'];
+        return ['CRYSTAL_SPIKE','ring16','aimed3'];
+      } if(wid==='volcano'){
+        if(e.vph>=3) return ['SATURN_RING','ERUPTION','MELTDOWN','SPIRAL_STORM'];
+        if(e.vph>=2) return ['SATURN_RING','ERUPTION','LAVA_POOL','aimed5'];
+        return ['ERUPTION','ring16','aimed3'];
+      }
       if(e.vph>=3) return ['SATURN_RING','MELTDOWN','spiral','SPIRAL_STORM'];
       if(e.vph>=2) return ['SATURN_RING','LAVA_POOL','EMBER_RAIN','aimed5'];
       return ['LAVA_POOL','ring16','aimed3'];
-    case 'tralala2':                       // the BOUNCE boss — ricochets off the walls
+    }
+    case 'tralala2': {                     // bounce boss — ricochet thrives in every arena shape
+      const wid=curWorld().id;
+      if(wid==='swamp'){
+        // wide flat — ricochet bounces horizontally; add flood for lane control
+        if(e.vph>=3) return ['RICOCHET','SWAMP_FLOOD','SWEEP_DUAL','ring2','TWIN_STORM'];
+        if(e.vph>=2) return ['RICOCHET','SWAMP_FLOOD','ring2','RING_VOLLEY'];
+        return ['RICOCHET','SWAMP_FLOOD','ring16'];
+      } if(wid==='sky'){
+        if(e.vph>=3) return ['RICOCHET','SKY_PLUNGE','SWEEP_DUAL','ring2','TWIN_STORM'];
+        if(e.vph>=2) return ['RICOCHET','SKY_PLUNGE','PRISM_SPLIT','RING_VOLLEY'];
+        return ['RICOCHET','SKY_PLUNGE','ring16'];
+      } if(wid==='crystal'){
+        // narrow tall — ricochet is brutal; vertical crystal spikes add squeeze
+        if(e.vph>=3) return ['RICOCHET','CRYSTAL_SPIKE','SWEEP_DUAL','ring2','TWIN_STORM'];
+        if(e.vph>=2) return ['RICOCHET','CRYSTAL_SPIKE','PRISM_SPLIT','RING_VOLLEY'];
+        return ['RICOCHET','CRYSTAL_SPIKE','aimed3'];
+      } if(wid==='volcano'){
+        if(e.vph>=3) return ['RICOCHET','ERUPTION','SWEEP_DUAL','ring2','TWIN_STORM'];
+        if(e.vph>=2) return ['RICOCHET','ERUPTION','PRISM_SPLIT','RING_VOLLEY'];
+        return ['RICOCHET','ERUPTION','ring16'];
+      }
       if(e.vph>=3) return ['RICOCHET','SWEEP_DUAL','ring2','TWIN_STORM'];
       if(e.vph>=2) return ['RICOCHET','PRISM_SPLIT','ring2','RING_VOLLEY'];
       return ['SWEEP','ring16','aimed3'];
-    case 'croco2':                         // brood / adds + carpet bombing run
+    }
+    case 'croco2': {                       // brood + carpet — world-themed adds and bombing
+      const wid=curWorld().id;
+      if(wid==='swamp'){
+        if(e.vph>=3) return ['CARPET_RUN','BROOD_BURST','SWAMP_FLOOD','RING_VOLLEY'];
+        if(e.vph>=2) return ['CARPET_RUN','SUMMON','SWAMP_FLOOD','EXPAND_IMPLODE'];
+        return ['SUMMON','SWAMP_FLOOD','aimed5'];
+      } if(wid==='sky'){
+        if(e.vph>=3) return ['CARPET_RUN','BROOD_BURST','SKY_PLUNGE','RING_VOLLEY'];
+        if(e.vph>=2) return ['CARPET_RUN','SUMMON','SKY_PLUNGE','SPIRAL_STORM'];
+        return ['SUMMON','SKY_PLUNGE','ring16'];
+      } if(wid==='crystal'){
+        if(e.vph>=3) return ['CARPET_RUN','BROOD_BURST','CRYSTAL_SPIKE','TWIN_STORM'];
+        if(e.vph>=2) return ['CARPET_RUN','SUMMON','CRYSTAL_SPIKE','SPIRAL_STORM'];
+        return ['SUMMON','CRYSTAL_SPIKE','aimed5'];
+      } if(wid==='volcano'){
+        if(e.vph>=3) return ['CARPET_RUN','BROOD_BURST','ERUPTION','RING_VOLLEY'];
+        if(e.vph>=2) return ['CARPET_RUN','SUMMON','ERUPTION','SPIRAL_STORM'];
+        return ['SUMMON','ERUPTION','aimed5'];
+      }
       if(e.vph>=3) return ['CARPET_RUN','BROOD_BURST','SPORE_FIELD','RING_VOLLEY'];
       if(e.vph>=2) return ['CARPET_RUN','SUMMON','spiral','SPIRAL_STORM'];
       return ['SUMMON','ring16','aimed5'];
-    case 'madudung':                       // final boss — lead (tether links the duo)
+    }
+    case 'madudung': {                     // final boss lead — world-themed chaos
+      const wid=curWorld().id;
+      if(wid==='swamp'){
+        if(e.vph>=3) return ['TETHER','DEVOUR','SWAMP_FLOOD','SUMMON','TWIN_STORM'];
+        if(e.vph>=2) return ['TETHER','SWAMP_FLOOD','SWEEP_DUAL','BURROW_DOUBLE','RING_VOLLEY'];
+        return ['BURROW_SLAM','SWAMP_FLOOD','aimed5','ring16'];
+      } if(wid==='sky'){
+        if(e.vph>=3) return ['TETHER','DEVOUR','SKY_PLUNGE','EXPAND_IMPLODE','SPIRAL_STORM'];
+        if(e.vph>=2) return ['TETHER','SKY_PLUNGE','SWEEP_DUAL','ring2','RING_VOLLEY'];
+        return ['SKY_PLUNGE','BURROW_SLAM','aimed5','ring16'];
+      } if(wid==='crystal'){
+        if(e.vph>=3) return ['TETHER','DEVOUR','CRYSTAL_SPIKE','PRISM_SPLIT','TWIN_STORM'];
+        if(e.vph>=2) return ['TETHER','CRYSTAL_SPIKE','SWEEP_DUAL','BURROW_DOUBLE','RING_VOLLEY'];
+        return ['BURROW_SLAM','CRYSTAL_SPIKE','aimed5','ring12'];
+      } if(wid==='volcano'){
+        if(e.vph>=3) return ['TETHER','DEVOUR','ERUPTION','SATURN_RING','SPIRAL_STORM'];
+        if(e.vph>=2) return ['TETHER','ERUPTION','QUAKE_RADIAL','MELTDOWN','RING_VOLLEY'];
+        return ['BURROW_SLAM','ERUPTION','QUAKE_LINE','ring16'];
+      }
       if(e.vph>=3) return ['TETHER','DEVOUR','MELTDOWN','SUMMON','SPIRAL_STORM'];
       if(e.vph>=2) return ['TETHER','LAVA_POOL','SWEEP_DUAL','BURROW_DOUBLE','RING_VOLLEY'];
       return ['BURROW_SLAM','QUAKE_LINE','aimed5','ring16'];
-    case 'garamaraman':                    // final boss — duo partner (complementary)
+    }
+    case 'garamaraman': {                  // final boss duo partner — complements lead
+      const wid=curWorld().id;
+      if(wid==='swamp'){
+        if(e.vph>=3) return ['SWAMP_FLOOD','EXPAND_IMPLODE','spiral','TWIN_STORM'];
+        if(e.vph>=2) return ['SWAMP_FLOOD','SPORE_FIELD','aimed5','RING_VOLLEY'];
+        return ['SWAMP_FLOOD','aimed5','ring12'];
+      } if(wid==='sky'){
+        if(e.vph>=3) return ['SKY_PLUNGE','EXPAND_IMPLODE','spiral','TWIN_STORM'];
+        if(e.vph>=2) return ['SKY_PLUNGE','ring2','aimed5','RING_VOLLEY'];
+        return ['SKY_PLUNGE','aimed5','ring12'];
+      } if(wid==='crystal'){
+        if(e.vph>=3) return ['CRYSTAL_SPIKE','PRISM_SPLIT','spiral','TWIN_STORM'];
+        if(e.vph>=2) return ['CRYSTAL_SPIKE','PRISM_SPLIT','aimed5','RING_VOLLEY'];
+        return ['CRYSTAL_SPIKE','aimed5','ring12'];
+      } if(wid==='volcano'){
+        if(e.vph>=3) return ['ERUPTION','QUAKE_RADIAL','spiral','TWIN_STORM'];
+        if(e.vph>=2) return ['ERUPTION','QUAKE_CROSS','aimed5','RING_VOLLEY'];
+        return ['ERUPTION','aimed5','ring12'];
+      }
       if(e.vph>=3) return ['QUAKE_RADIAL','EMBER_RAIN','spiral','TWIN_STORM'];
       if(e.vph>=2) return ['QUAKE_CROSS','PRISM_SPLIT','aimed5','RING_VOLLEY'];
       return ['QUAKE_LINE','aimed5','ring12'];
+    }
   }
   return ['ring16'];
 }
@@ -2807,6 +2943,8 @@ const MOVE_COL = { dash:'#e54d4d', spiral:'#e54d4d', aimed3:'#e23b3b', aimed5:'#
   ring16:'#4aa3df', ring12:'#3f7d33', ring2:'#7ec8ff', ring2x:'#d2a0ff', carpet:'#ff2e2e',
   slam:'#a9763e', dblslam:'#a9763e', seedsmash:'#e0503f', pull:'#d2a0ff', pullspiral:'#d2a0ff',
   roll:'#e0503f', warp:'#c77dff',
+  // world-themed new moves
+  SWAMP_FLOOD:'#5a7a3a', ERUPTION:'#e0502c', SKY_PLUNGE:'#9fd0ff', CRYSTAL_SPIKE:'#b08fe0',
   // World 2
   BURROW_SLAM:'#7a5a30', BURROW_DOUBLE:'#7a5a30', DEBRIS3:'#9a7a52',
   QUAKE_LINE:'#e0503f', QUAKE_CROSS:'#e0503f', QUAKE_RADIAL:'#e0503f',
@@ -3069,6 +3207,15 @@ function execMove(e){
       e.warpT=0.45; burst(e.x,e.y,'#ff5ea8',18,240); return 0.9;
     case 'CONFETTI_SPIRAL':
       e.storm=2.2; e.stormN=7; e.stormSpd=125; e.stormStep=0.28; e.stormDir=Math.random()<0.5?1:-1; e.stormCol='#ffd24a'; e.stormCd=0.12; e.stormTwin=(e.vph>=3); e.stormRainbow=true; sfx.warn(); return 2.2;
+    // ---- world-themed moves (worlds 6-10) ----
+    case 'SWAMP_FLOOD': // slow-zone sweep across arena width (swamp)
+      { const a=arena; for(let k=0;k<5;k++) addZone(a?a.x+(k+0.5)*(a.w/5):P.x+rand(-200,200), P.y+rand(-80,80), 54, {tele:0.6,life:2.8,dps:10,slow:true,col:'#5a7a3a'}); return 0.4; }
+    case 'ERUPTION': // lava pools scattered over whole arena + ring (volcano)
+      { const a=arena; const n=6; for(let k=0;k<n;k++) addZone(a?rand(a.x+40,a.x+a.w-40):P.x+rand(-200,200), a?rand(a.y+40,a.y+a.h-40):P.y+rand(-200,200), 62, {tele:0.65,life:2.4,dps:16,col:'#e0502c'}); mRing(e,18,150,'#ff7a2a'); shake=Math.max(shake,8); return 0.45; }
+    case 'SKY_PLUNGE': // fast aimed dive + gapped ring (skyland)
+      e.dst='wind'; e.dwin=e.enraged?0.28:0.42; e.da=Math.atan2(P.y-e.y,P.x-e.x); e.landFx={type:'dive'}; mRingGap(e,14,130,'#9fd0ff',0.32); sfx.warn(); return 0.9;
+    case 'CRYSTAL_SPIKE': // vertical column of zones top-to-bottom (crystal caves)
+      { const a=arena; const aY=a?a.y:WALL, aH=a?a.h:WORLD.h-2*WALL; for(let k=1;k<=5;k++) addZone(P.x+rand(-30,30), aY+k*(aH/5.5), 48, {tele:0.38+k*0.1,life:0.7,dps:18,col:'#b08fe0'}); sfx.warn(); return 0.55; }
   }
   return 0.2;
 }
@@ -3185,7 +3332,7 @@ function startFinalCharge(e){
   e.mst='recover'; e.mt=FINAL_CHARGE;
   ebullets=[];
   bigText('FINAL PHASE!','#ff5acd'); shake=Math.max(shake,14); sfx.boss();
-  const scr=FINAL_SCRIPT[e.mk];                 // bespoke staged finale (W3/W4) instead of the random move pool
+  const scr=e.mk==='madudung' ? madudungFinalScript() : FINAL_SCRIPT[e.mk];
   if(scr){ e.script=scr; e.si=0; e.sNew=true; e.sT=scr[0].dur; e.loop=0; e.scriptPause=false; }
   expandFinalArena(e);
   if(e.mate){ const m=e.mate; m.charging=FINAL_CHARGE; m.iv=FINAL_CHARGE+0.3;
@@ -3209,6 +3356,102 @@ function expandFinalArena(e){
 // window (boss drops its guard, screen clears, big banner "STRIKE NOW"). It loops and escalates
 // (e.loop). Each boss's stages are wholly distinct from each other and from every other fight.
 // ============================================================
+// ---- madudung final script: world-aware staged finale (worlds 6-10) ----
+function madudungFinalScript(){
+  const wid = curWorld().id;
+  const DPS = { name:'OPENING — STRIKE NOW!', col:'#7ed957', dur:8.0, iv:false };
+  if(wid==='swamp') return [
+    { name:'BOG SURGE', col:'#5a7a3a', dur:7.5, iv:true, hold:'center',
+      enter(e){ e.sCd=0.7; e.tether=7.5; },
+      tick(e,dt){ e.sCd-=dt; if(e.sCd<=0){ e.sCd=Math.max(0.55,0.9-e.loop*0.1);
+        const a=arena; for(let k=0;k<4;k++) addZone(a?a.x+(k+0.5)*(a.w/4):P.x+rand(-200,200), P.y+rand(-90,90), 54, {tele:0.6,life:2.6,dps:12,slow:true,col:'#5a7a3a'});
+        mRingGap(e,14+e.loop*2,120,'#5a7a3a',0.32); } } },
+    DPS,
+    { name:'SWAMP WALLS', col:'#5a7a3a', dur:8.0, iv:true, vulnMul:0.35,
+      enter(e){ e.sCd=0.4; e.sk=0; },
+      tick(e,dt){ e.sCd-=dt; if(e.sCd<=0){ e.sCd=Math.max(1.3,1.8-e.loop*0.15); e.sk++;
+        const a=arena; if(!a) return;
+        const horiz=(e.sk%2===0), side=horiz?(e.sk%4<2?'left':'right'):(e.sk%4<2?'top':'bottom');
+        const gapAt=horiz?rand(a.y+70,a.y+a.h-70):rand(a.x+70,a.x+a.w-70);
+        mWall(side,155+e.loop*15,'#5a7a3a',gapAt,70,13); } } },
+    DPS,
+    { name:'DEVOUR THE SWAMP', col:'#3a5a2a', dur:5.5, iv:true, hold:'center',
+      enter(e){ e.pull=5.5; e.pullStr=160; burst(e.x,e.y,'#5a7a3a',28,320); shake=Math.max(shake,12);
+        e.storm=5.5; e.stormN=8+e.loop; e.stormSpd=140; e.stormStep=0.28; e.stormDir=1; e.stormCol='#5a7a3a'; e.stormCd=0.12; e.stormTwin=true; e.stormRainbow=false; sfx.warn(); },
+      tick(){} },
+    DPS,
+  ];
+  if(wid==='sky') return [
+    { name:'STORM FRONT', col:'#9fd0ff', dur:7.5, iv:true, hold:'center',
+      enter(e){ e.storm=7.5; e.stormN=7+e.loop; e.stormSpd=130; e.stormStep=0.27; e.stormDir=Math.random()<0.5?1:-1;
+        e.stormCol='#9fd0ff'; e.stormCd=0.12; e.stormTwin=true; e.stormRainbow=false; e.sCd=1.0; sfx.warn(); },
+      tick(e,dt){ e.sCd-=dt; if(e.sCd<=0){ e.sCd=1.2; mRingGap(e,14+e.loop*2,115,'#bfe6ff',0.30); } } },
+    DPS,
+    { name:'SKY DIVE BARRAGE', col:'#bfe6ff', dur:8.0, iv:true, vulnMul:0.4,
+      enter(e){ e.sCd=0.5; e.sk=0; },
+      tick(e,dt){ e.sCd-=dt; if(e.sCd<=0){ e.sCd=Math.max(1.2,1.7-e.loop*0.15); e.sk++;
+        e.dst='wind'; e.dwin=0.32; e.da=Math.atan2(P.y-e.y,P.x-e.x); e.landFx={type:'dive'};
+        mRingGap(e,14+e.loop*2,130,'#9fd0ff',0.30); sfx.warn(); } } },
+    DPS,
+    { name:'MAELSTROM', col:'#7ec8ff', dur:6.0, iv:true, hold:'center',
+      enter(e){ e.pull=6.0; e.pullStr=170; burst(e.x,e.y,'#9fd0ff',28,340); shake=Math.max(shake,12);
+        e.storm=6.0; e.stormN=9+e.loop; e.stormSpd=145; e.stormStep=0.25; e.stormDir=1; e.stormCol='#bfe6ff'; e.stormCd=0.11; e.stormTwin=true; e.stormRainbow=false; sfx.warn(); },
+      tick(){} },
+    DPS,
+  ];
+  if(wid==='crystal') return [
+    { name:'CRYSTAL PRISON', col:'#b08fe0', dur:7.5, iv:true, hold:'center',
+      enter(e){ e.sCd=0.6; },
+      tick(e,dt){ e.sCd-=dt; if(e.sCd<=0){ e.sCd=Math.max(0.5,0.85-e.loop*0.08);
+        const a=arena; const aY=a?a.y:WALL, aH=a?a.h:600;
+        for(let k=1;k<=5;k++) addZone(P.x+rand(-40,40), aY+k*(aH/5.5), 48, {tele:0.35+k*0.1,life:0.7,dps:18,col:'#b08fe0'});
+        mRingGap(e,12+e.loop*2,115,'#b08fe0',0.34); } } },
+    DPS,
+    { name:'PRISM WALLS', col:'#9070c0', dur:8.0, iv:true, vulnMul:0.35,
+      enter(e){ e.sCd=0.4; e.sk=0; },
+      tick(e,dt){ e.sCd-=dt; if(e.sCd<=0){ e.sCd=Math.max(1.2,1.7-e.loop*0.14); e.sk++;
+        const a=arena; if(!a) return;
+        const side=e.sk%2===0?'top':'bottom';
+        const gapAt=rand(a.x+70,a.x+a.w-70);
+        mWall(side,150+e.loop*15,'#b08fe0',gapAt,68,12);
+        const aim=Math.atan2(P.y-e.y,P.x-e.x); for(let k=-2;k<=2;k++) fireEB(e.x,e.y,aim+k*0.22,145,'#7ec8ff',{split:true,splitT:0.5}); } } },
+    DPS,
+    { name:'SHARD STORM', col:'#d2a0ff', dur:5.5, iv:true, hold:'center',
+      enter(e){ e.storm=5.5; e.stormN=8+e.loop; e.stormSpd=135; e.stormStep=0.27; e.stormDir=Math.random()<0.5?1:-1;
+        e.stormCol='#b08fe0'; e.stormCd=0.11; e.stormTwin=true; e.stormRainbow=false;
+        burst(e.x,e.y,'#b08fe0',28,300); shake=Math.max(shake,12); sfx.warn(); },
+      tick(){} },
+    DPS,
+  ];
+  if(wid==='volcano') return [
+    { name:'MAGMA WALTZ', col:'#e0502c', dur:7.5, iv:true, hold:'center',
+      enter(e){ e.gsweep={ t:7.5, ang:rand(0,TAU), dir:Math.random()<0.5?1:-1, dropT:0 };
+        if(e.loop>0){ e.gsweep.dir2=-e.gsweep.dir; e.gsweep.ang2=e.gsweep.ang+Math.PI; }
+        e.sCd=0.7; },
+      tick(e,dt){
+        if(e.gsweep?.dir2!=null){ e.gsweep.ang2+=e.gsweep.dir2*1.5*dt;
+          e.gsweep.d2T=(e.gsweep.d2T||0)-dt; if(e.gsweep.d2T<=0){ e.gsweep.d2T=0.16; geyserLine(e.x,e.y,e.gsweep.ang2,'#e0502c',6,52); } }
+        e.sCd-=dt; if(e.sCd<=0){ e.sCd=Math.max(0.55,0.9-e.loop*0.1);
+          addZone(P.x,P.y,64,{tele:0.6,life:2.2,dps:16,col:'#e0502c'}); mRingGap(e,14+e.loop*2,120,'#ff7a2a',0.30); } } },
+    DPS,
+    { name:'ERUPTION SEQUENCE', col:'#ff7a2a', dur:8.0, iv:true, vulnMul:0.38,
+      enter(e){ e.sCd=0.45; e.sk=0; },
+      tick(e,dt){ e.sCd-=dt; if(e.sCd<=0){ e.sCd=Math.max(1.1,1.6-e.loop*0.12); e.sk++;
+        const a=arena; const n=5;
+        for(let k=0;k<n;k++) addZone(a?rand(a.x+40,a.x+a.w-40):P.x+rand(-200,200), a?rand(a.y+40,a.y+a.h-40):P.y+rand(-200,200), 64,{tele:0.65,life:2.4,dps:16,col:'#e0502c'});
+        mRing(e,20,155,'#ff7a2a'); shake=Math.max(shake,7); } } },
+    DPS,
+    { name:'CATACLYSM', col:'#ff3b10', dur:6.0, iv:true, hold:'center',
+      enter(e){ burst(e.x,e.y,'#e0502c',32,380); shake=Math.max(shake,14);
+        e.storm=6.0; e.stormN=10+e.loop; e.stormSpd=155; e.stormStep=0.24; e.stormDir=1; e.stormCol='#ff7a2a'; e.stormCd=0.10; e.stormTwin=true; e.stormRainbow=false; sfx.warn();
+        e.sCd=1.2; },
+      tick(e,dt){ e.sCd-=dt; if(e.sCd<=0){ e.sCd=1.4; mRingGap(e,18+e.loop*2,140,'#e0502c',0.22); shake=Math.max(shake,6); } } },
+    DPS,
+  ];
+  // dirt (default) — original random-pool fight; no script
+  return null;
+}
+
 const FINAL_SCRIPT = {
   // ===== WORLD 3 · COCOFANTO MASTODONTE — "TERREMOTO FINALE" : a seismic, ground-control colossus =====
   cocofantoboss: [
