@@ -4183,7 +4183,7 @@ function drawMiniCamera(view,mx,my,clipCircle){
   const x=mx+(camera.x-view.ox)*view.sx, y=my+(camera.y-view.oy)*view.sy;
   const w=(W/zoom)*view.sx, h=(H/zoom)*view.sy;
   if(clipCircle){
-    const cx0=mx+view.size/2, cy0=my+view.size/2, r=view.size/2-5;
+    const cx0=mx+view.mw/2, cy0=my+view.mh/2, r=view.size/2-5;
     const corners=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(([px,py])=>{
       const dx=px-cx0, dy=py-cy0, d=Math.max(1,Math.hypot(dx,dy));
       return d>r ? [cx0+dx/d*r, cy0+dy/d*r] : [px,py];
@@ -4196,7 +4196,7 @@ function drawMiniCamera(view,mx,my,clipCircle){
   cx.strokeStyle='rgba(255,255,255,.82)'; cx.lineWidth=2; cx.strokeRect(x,y,w,h);
 }
 function drawMiniEntities(view,mx,my,mode){
-  const circleClip = mode==='radar', rClip=view.size/2-5, cx0=mx+view.size/2, cy0=my+view.size/2;
+  const circleClip = mode==='radar', rClip=view.size/2-5, cx0=mx+view.mw/2, cy0=my+view.mh/2;
   const visible=p=>p.visible && (!circleClip || Math.hypot(p.x-cx0,p.y-cy0)<=rClip);
   const radarAlpha=p=>circleClip ? clamp(1 - (Math.hypot(p.x-cx0,p.y-cy0)/rClip)*0.45, 0.55, 1) : 1;
   for(const g of gems){
@@ -4233,7 +4233,7 @@ function drawMiniEntities(view,mx,my,mode){
   }
   cx.globalAlpha=1;
   {
-    const pp = view.challenger ? {x:mx+view.size/2,y:my+view.size/2,visible:true} : miniProject(view,P.x,P.y,mx,my);
+    const pp = view.challenger ? {x:mx+view.mw/2,y:my+view.mh/2,visible:true} : miniProject(view,P.x,P.y,mx,my);
     miniDisc(pp.x,pp.y,7,'#fff','#2a1c10',2.4); miniDisc(pp.x,pp.y,3.2,'#5fbf52',null,0);
   }
 }
@@ -4244,29 +4244,31 @@ function drawMiniArena(view,mx,my){
   cx.setLineDash([]);
 }
 function drawMinimap(){
-  const g=minimapGeom(), ms=g.ms, mx=g.mx, my=g.my;
+  const ms=minimapSize(), pad=18;
   const view=MMH.buildMinimapView({ gameMode, world:WORLD, player:P, size:ms });
+  const mx=pad, my=H-view.mh-pad;
   cx.save(); cx.globalAlpha=1;
-  drawMinimapCard(view,mx,my,ms);
+  drawMinimapCard(view,mx,my);
   cx.restore();
 }
-function drawMinimapCard(view,mx,my,ms){
-  miniRoundRect(mx-4,my-4,ms+8,ms+8,15,'#2a1c10',null,0);
-  miniRoundRect(mx,my,ms,ms,11,curTheme.tile1||'#76bf42',null,0);
+function drawMinimapCard(view,mx,my){
+  const mw=view.mw, mh=view.mh;
+  miniRoundRect(mx-4,my-4,mw+8,mh+8,15,'#2a1c10',null,0);
+  miniRoundRect(mx,my,mw,mh,11,curTheme.tile1||'#76bf42',null,0);
   cx.save();
-  cx.beginPath(); cx.roundRect(mx,my,ms,ms,11); cx.clip();
-  const tile=Math.max(22,Math.round(ms/6));
-  for(let y=0;y<ms;y+=tile){
-    for(let x=0;x<ms;x+=tile){
+  cx.beginPath(); cx.roundRect(mx,my,mw,mh,11); cx.clip();
+  const tile=Math.max(22,Math.round(Math.max(mw,mh)/6));
+  for(let y=0;y<mh;y+=tile){
+    for(let x=0;x<mw;x+=tile){
       cx.fillStyle=((x/tile+y/tile)&1) ? (curTheme.tile2||'#82c84a') : (curTheme.tile1||'#76bf42');
-      cx.fillRect(mx+x,my+y,Math.min(tile,ms-x),Math.min(tile,ms-y));
+      cx.fillRect(mx+x,my+y,Math.min(tile,mw-x),Math.min(tile,mh-y));
     }
   }
   drawMiniArena(view,mx,my);
   drawMiniCamera(view,mx,my,false);
   drawMiniEntities(view,mx,my,'card');
   cx.restore();
-  miniRoundRect(mx-4,my-4,ms+8,ms+8,15,null,'#2a1c10',3.2);
+  miniRoundRect(mx-4,my-4,mw+8,mh+8,15,null,'#2a1c10',3.2);
 }
 
 // ============ MAIN LOOP ============
