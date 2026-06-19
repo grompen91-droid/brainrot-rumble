@@ -1494,7 +1494,7 @@ function drawSkibidiToilet(b){
 }
 
 function addZone(x,y,r,o){
-  zones.push({ x,y,r, t:0, tele:o.tele||0.6, life:o.life||1.4, dps:o.dps||10, slow:!!o.slow, col:o.col||'#e8a93a', friendly:!!o.friendly });
+  zones.push({ x,y,r, t:0, tele:o.tele||0.6, life:o.life||1.4, dps:o.dps||10, slow:!!o.slow, col:o.col||'#e8a93a', friendly:!!o.friendly, fromX:o.fromX, fromY:o.fromY });
 }
 
 // ============ LEVEL UP ============
@@ -3068,20 +3068,20 @@ function execMove(e){
     case 'QUAKE_LINE':    geyserLine(e.x,e.y,Math.atan2(P.y-e.y,P.x-e.x),'#e0503f',7,52); return 0.3;
     case 'QUAKE_CROSS':   { const a=Math.atan2(P.y-e.y,P.x-e.x); for(let q=0;q<4;q++) geyserLine(e.x,e.y,a+q*Math.PI/2,'#e0503f',6,52); return 0.35; }
     case 'QUAKE_RADIAL':  { const off=rand(0,TAU); for(let q=0;q<6;q++) geyserLine(e.x,e.y,off+q*TAU/6,'#e0503f',6,50); return 0.4; }
-    case 'LAVA_POOL':     addZone(P.x,P.y,70,{tele:0.6,life:2.2,dps:16,col:'#e0503f'}); return 0.3;
+    case 'LAVA_POOL':     addZone(P.x,P.y,70,{tele:0.7,life:2.2,dps:16,col:'#e0503f',fromX:e.x,fromY:e.y}); return 0.3;
     case 'EMBER_RAIN':    debrisDrop(5,'#ff7a2a'); return 0.35;
-    case 'MELTDOWN':      for(let k=0;k<4;k++) addZone(rand(WALL+80,WORLD.w-WALL-80),rand(WALL+80,WORLD.h-WALL-80),66,{tele:0.7,life:2.6,dps:16,col:'#e0503f'}); mRing(e,20,150,'#ff7a2a'); return 0.4;
+    case 'MELTDOWN':      for(let k=0;k<4;k++) addZone(rand(WALL+80,WORLD.w-WALL-80),rand(WALL+80,WORLD.h-WALL-80),66,{tele:0.8,life:2.6,dps:16,col:'#e0503f',fromX:e.x,fromY:e.y}); mRing(e,20,150,'#ff7a2a'); return 0.4;
     case 'SWEEP':         e.spin=1.4; e.spinCol='#b06ff0'; return 1.0;
     case 'SWEEP_DUAL':    e.spin=1.6; e.spinCol='#d2a0ff'; return 1.1;
     case 'PRISM_SPLIT':   { const aim=Math.atan2(P.y-e.y,P.x-e.x); for(let k=-2;k<=2;k++) fireEB(e.x,e.y,aim+k*0.18,150,'#7ec8ff',{split:true,splitT:0.5}); muzzleFlash(e.x,e.y,'#7ec8ff'); return 0.25; }
     case 'EXPAND_IMPLODE':mRing(e,22,160,'#d2a0ff'); e.pull=1.2; e.pullStr=120; return 1.2;
     case 'SUMMON':        summonAdds(e,'golubiro',3,6); return 0.4;
-    case 'SPORE_FIELD':   for(let k=0;k<4;k++) addZone(P.x+rand(-160,160),P.y+rand(-160,160),60,{tele:0.6,life:2.4,dps:8,slow:true,col:'#7ab955'}); return 0.4;
+    case 'SPORE_FIELD':   for(let k=0;k<4;k++) addZone(P.x+rand(-160,160),P.y+rand(-160,160),60,{tele:0.75,life:2.4,dps:8,slow:true,col:'#7ab955',fromX:e.x,fromY:e.y}); return 0.4;
     case 'BROOD_BURST':   summonAdds(e,'golubiro',4,8); mRing(e,20,160,'#d2a0ff'); mRing(e,16,110,'#b06ff0'); return 0.4;
     case 'DEVOUR':        e.pull=1.4; e.pullStr=150; mRing(e,20,160,'#d2a0ff'); mRing(e,20,110,'#b06ff0'); return 1.2;
     // ---- original signature attacks ----
     case 'RICOCHET':      e.wd={ n:3, ang:Math.atan2(P.y-e.y,P.x-e.x), spd:e.enraged?500:430, tT:0, life:2.4 }; sfx.warn(); burst(e.x,e.y,'#7ec8ff',20,320); return 2.4;
-    case 'DRUM_MARCH':    { const a=Math.atan2(P.y-e.y,P.x-e.x); for(let k=1;k<=5;k++) addZone(e.x+Math.cos(a)*92*k, e.y+Math.sin(a)*92*k, 70, {tele:0.3+k*0.22, life:0.45, dps:20, col:'#a9763e'}); sfx.hit(); return 0.7; }
+    case 'DRUM_MARCH':    { const a=Math.atan2(P.y-e.y,P.x-e.x); for(let k=1;k<=5;k++) addZone(e.x+Math.cos(a)*92*k, e.y+Math.sin(a)*92*k, 70, {tele:0.3+k*0.22, life:0.45, dps:20, col:'#a9763e', fromX:e.x, fromY:e.y}); sfx.hit(); return 0.7; }
     case 'GEYSER_SWEEP':  e.gsweep={ t:1.8, ang:Math.atan2(P.y-e.y,P.x-e.x), dir:Math.random()<0.5?1:-1, dropT:0 }; return 1.8;
     case 'SATURN_RING':   { const N=18, off=rand(0,TAU), dir=Math.random()<0.5?1:-1; for(let k=0;k<N;k++) fireEB(e.x,e.y,0,0,'#ffd24a',{orbit:{cx:e.x,cy:e.y,ang:off+k*TAU/N,rad:42,angV:dir*1.8,radV:58}}); muzzleFlash(e.x,e.y,'#ffd24a'); return 0.4; }
     case 'CARPET_RUN':    e.dst='wind'; e.dwin=e.enraged?0.3:0.45; e.da=Math.atan2(P.y-e.y,P.x-e.x); e.carpet=0.62; e.cbT=0; return 0.9;
@@ -3261,31 +3261,31 @@ function execMove(e){
       e.storm=2.2; e.stormN=7; e.stormSpd=125; e.stormStep=0.28; e.stormDir=Math.random()<0.5?1:-1; e.stormCol='#ffd24a'; e.stormCd=0.12; e.stormTwin=(e.vph>=3); e.stormRainbow=true; sfx.warn(); return 2.2;
     // ---- W6 swamp boss moves ----
     case 'DOLL_CURSE': // ring of slow zones around boss — voodoo aura
-      { const off=rand(0,TAU); for(let k=0;k<6;k++) addZone(e.x+Math.cos(off+k*TAU/6)*130, e.y+Math.sin(off+k*TAU/6)*130, 42, {tele:0.6,life:2.4,dps:10,slow:true,col:'#5a7a3a'}); mRingGap(e,14,115,'#5a7a3a',0.32); sfx.hit(); return 0.5; }
+      { const off=rand(0,TAU); for(let k=0;k<6;k++) addZone(e.x+Math.cos(off+k*TAU/6)*130, e.y+Math.sin(off+k*TAU/6)*130, 42, {tele:0.7,life:2.4,dps:10,slow:true,col:'#5a7a3a',fromX:e.x,fromY:e.y}); mRingGap(e,14,115,'#5a7a3a',0.32); sfx.hit(); return 0.5; }
     case 'GATOR_LUNGE': // fast dash + landing slow zone
       e.dst='wind'; e.dwin=e.enraged?0.28:0.42; e.da=Math.atan2(P.y-e.y,P.x-e.x);
       e.landFx={type:'pounce'}; addZone(P.x,P.y,72,{tele:0.6,life:2.0,dps:14,slow:true,col:'#5a7a3a'}); sfx.warn(); return 0.9;
     // ---- World 6 (AUTUMN WOODS) boss moves ----
     case 'LEAF_BURST': // hexagon of slow leaf-zones around boss + gapped ring
-      { const off=rand(0,TAU); for(let k=0;k<6;k++) addZone(e.x+Math.cos(off+k*TAU/6)*125,e.y+Math.sin(off+k*TAU/6)*125,42,{tele:0.6,life:2.4,dps:12,slow:true,col:'#c87a30'}); mRingGap(e,14,110,'#c87a30',0.30); sfx.hit(); return 0.5; }
+      { const off=rand(0,TAU); for(let k=0;k<6;k++) addZone(e.x+Math.cos(off+k*TAU/6)*125,e.y+Math.sin(off+k*TAU/6)*125,42,{tele:0.75,life:2.4,dps:12,slow:true,col:'#c87a30',fromX:e.x,fromY:e.y}); mRingGap(e,14,110,'#c87a30',0.30); sfx.hit(); return 0.5; }
     case 'VINE_RING': // double amber+bark ring volley
       mRing(e,12,165,'#8a4f22'); mRing(e,8,92,'#c87a30'); return 0.30;
     case 'CANOPY_PLUNGE': // fast forest-drop dash + wide landing zone
       e.dst='wind'; e.dwin=e.enraged?0.26:0.40; e.da=Math.atan2(P.y-e.y,P.x-e.x);
-      e.landFx={type:'pounce'}; addZone(P.x,P.y,78,{tele:0.6,life:2.2,dps:16,slow:true,col:'#c87a30'}); sfx.warn(); return 0.9;
+      e.landFx={type:'pounce'}; addZone(P.x,P.y,78,{tele:0.7,life:2.2,dps:16,slow:true,col:'#c87a30',fromX:e.x,fromY:e.y}); sfx.warn(); return 0.9;
     case 'BRANCH_CRASH': // aimed 3-spread + small zone on landing
-      mAimed(e,3,0.20,200,'#c87a30'); addZone(P.x,P.y,52,{tele:0.5,life:1.6,dps:10,slow:true,col:'#8a4f22'}); return 0.3;
+      mAimed(e,3,0.20,200,'#c87a30'); addZone(P.x,P.y,52,{tele:0.6,life:1.6,dps:10,slow:true,col:'#8a4f22',fromX:e.x,fromY:e.y}); return 0.3;
     case 'FOREST_FLOOD': // amber zone sweep across arena width
-      { const a=arena; for(let k=0;k<5;k++) addZone(a?a.x+(k+0.5)*(a.w/5):P.x+rand(-200,200),P.y+rand(-100,100),58,{tele:0.6,life:2.6,dps:12,slow:true,col:'#c87a30'}); return 0.4; }
+      { const a=arena; for(let k=0;k<5;k++) addZone(a?a.x+(k+0.5)*(a.w/5):P.x+rand(-200,200),P.y+rand(-100,100),58,{tele:0.8,life:2.6,dps:12,slow:true,col:'#c87a30',fromX:e.x,fromY:e.y}); return 0.4; }
     // ---- world-themed moves (worlds 6-10) ----
     case 'SWAMP_FLOOD': // slow-zone sweep across arena width (swamp)
-      { const a=arena; for(let k=0;k<5;k++) addZone(a?a.x+(k+0.5)*(a.w/5):P.x+rand(-200,200), P.y+rand(-80,80), 54, {tele:0.6,life:2.8,dps:10,slow:true,col:'#5a7a3a'}); return 0.4; }
+      { const a=arena; for(let k=0;k<5;k++) addZone(a?a.x+(k+0.5)*(a.w/5):P.x+rand(-200,200), P.y+rand(-80,80), 54, {tele:0.8,life:2.8,dps:10,slow:true,col:'#5a7a3a',fromX:e.x,fromY:e.y}); return 0.4; }
     case 'ERUPTION': // lava pools scattered over whole arena + ring (volcano)
-      { const a=arena; const n=6; for(let k=0;k<n;k++) addZone(a?rand(a.x+40,a.x+a.w-40):P.x+rand(-200,200), a?rand(a.y+40,a.y+a.h-40):P.y+rand(-200,200), 62, {tele:0.65,life:2.4,dps:16,col:'#e0502c'}); mRing(e,18,150,'#ff7a2a'); shake=Math.max(shake,8); return 0.45; }
+      { const a=arena; const n=6; for(let k=0;k<n;k++) addZone(a?rand(a.x+40,a.x+a.w-40):P.x+rand(-200,200), a?rand(a.y+40,a.y+a.h-40):P.y+rand(-200,200), 62, {tele:0.85,life:2.4,dps:16,col:'#e0502c',fromX:e.x,fromY:e.y}); mRing(e,18,150,'#ff7a2a'); shake=Math.max(shake,8); return 0.5; }
     case 'SKY_PLUNGE': // fast aimed dive + gapped ring (skyland)
       e.dst='wind'; e.dwin=e.enraged?0.28:0.42; e.da=Math.atan2(P.y-e.y,P.x-e.x); e.landFx={type:'dive'}; mRingGap(e,14,130,'#9fd0ff',0.32); sfx.warn(); return 0.9;
     case 'CRYSTAL_SPIKE': // vertical column of zones top-to-bottom (crystal caves)
-      { const a=arena; const aY=a?a.y:WALL, aH=a?a.h:WORLD.h-2*WALL; for(let k=1;k<=5;k++) addZone(P.x+rand(-30,30), aY+k*(aH/5.5), 48, {tele:0.38+k*0.1,life:0.7,dps:18,col:'#b08fe0'}); sfx.warn(); return 0.55; }
+      { const a=arena; const aY=a?a.y:WALL, aH=a?a.h:WORLD.h-2*WALL; for(let k=1;k<=5;k++) addZone(P.x+rand(-30,30), aY+k*(aH/5.5), 48, {tele:0.38+k*0.1,life:0.7,dps:18,col:'#b08fe0',fromX:e.x,fromY:e.y}); sfx.warn(); return 0.55; }
   }
   return 0.2;
 }
@@ -4418,6 +4418,25 @@ function renderZones(){
       const ps=0.5+0.5*Math.sin(z.t*26);
       cx.globalAlpha=0.75+0.25*ps; cx.fillStyle=imminent?'#fff':danger;
       cx.beginPath(); cx.arc(z.x,z.y,4+3*ps,0,TAU); cx.fill();
+      // arcing projectile: travels from boss origin to landing spot
+      if(z.fromX !== undefined){
+        const dist=Math.hypot(z.x-z.fromX, z.y-z.fromY);
+        const arcH=Math.max(90, Math.min(340, dist*0.55));
+        const arcX=(t)=>z.fromX+(z.x-z.fromX)*t;
+        const arcY=(t)=>z.fromY+(z.y-z.fromY)*t - arcH*4*t*(1-t);
+        // trail
+        for(let ti=1;ti<=4;ti++){
+          const tk=Math.max(0,k-ti*0.055);
+          cx.globalAlpha=0.28*(1-ti/5);
+          cx.fillStyle=danger; cx.beginPath(); cx.arc(arcX(tk),arcY(tk),5-ti,0,TAU); cx.fill();
+        }
+        // projectile body
+        const px=arcX(k), py=arcY(k);
+        cx.globalAlpha=1;
+        cx.fillStyle='#111'; cx.beginPath(); cx.arc(px,py,8,0,TAU); cx.fill();
+        cx.fillStyle=danger; cx.beginPath(); cx.arc(px,py,6,0,TAU); cx.fill();
+        cx.fillStyle='rgba(255,255,255,0.7)'; cx.beginPath(); cx.arc(px-2,py-2,2.5,0,TAU); cx.fill();
+      }
     } else {                              // active: bright fill + a white impact flash
       const k=Math.max(0,1-(z.t-z.tele)/z.life);
       cx.globalAlpha=0.5*k+0.18; cx.fillStyle=danger; cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.fill();
