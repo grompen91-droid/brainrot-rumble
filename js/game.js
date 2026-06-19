@@ -23,6 +23,11 @@ let chalBossIdx = 0;        // index of next boss milestone (0-3 → 5/10/15/20 
 let chalBossActive = false; // true while a challenger boss is alive
 let chalLuckyT = 0;         // countdown to next lucky block batch in challenger
 const CHAL_BOSS_TIMES = [300, 600, 900, 1200];  // seconds: 5/10/15/20 min
+// Challenger World 3 only: middle boss cut, run shortened to 15 min — first boss, third boss, final boss.
+const CHAL_BOSS_TIMES_W3 = [300, 600, 900];     // seconds: 5/10/15 min
+const CHAL_BOSS_MAP_W3 = [0, 2, 3];             // milestone idx → curBosses index (skips index 1, the middle boss)
+function chalIsW3(){ return gameMode==='challenger' && worldIdx===2; }
+function curChalBossTimes(){ return chalIsW3() ? CHAL_BOSS_TIMES_W3 : CHAL_BOSS_TIMES; }
 
 // ===== PRACTICE MODE STATE =====
 // Sandbox gamemode: no rewards, single customizable "world", reuses the challenger
@@ -30,8 +35,8 @@ const CHAL_BOSS_TIMES = [300, 600, 900, 1200];  // seconds: 5/10/15/20 min
 let practiceCfg = { infiniteWaves:true, timerBased:false, infiniteMap:false, bossIntervalSec:300, foes:null, bosses:null, _foeSet:null, _bossSet:null };
 function timerMode(){ return gameMode==='challenger' || (gameMode==='practice' && practiceCfg.timerBased); }
 function infiniteMapMode(){ return gameMode==='challenger' || (gameMode==='practice' && practiceCfg.infiniteMap); }
-function nextBossTimeSec(){ return gameMode==='practice' ? practiceCfg.bossIntervalSec*(chalBossIdx+1) : (CHAL_BOSS_TIMES[chalBossIdx]||300); }
-function hasMoreMilestones(){ return gameMode==='practice' ? true : chalBossIdx<CHAL_BOSS_TIMES.length; }
+function nextBossTimeSec(){ return gameMode==='practice' ? practiceCfg.bossIntervalSec*(chalBossIdx+1) : (curChalBossTimes()[chalBossIdx]||300); }
+function hasMoreMilestones(){ return gameMode==='practice' ? true : chalBossIdx<curChalBossTimes().length; }
 // Challenger needs story world 3 cleared; its own progression is independent after that
 const _storyP = +(localStorage.getItem('br_unlocked')||0);
 let chalUnlocked = _storyP >= 3
@@ -1285,16 +1290,18 @@ function ringPos(){ // spawn point on a ring around player, clamped to world
 }
 
 function spawnBoss(){
+  const milestoneIdx = ((Math.floor(wave/5)-1) % curBosses.length + curBosses.length) % curBosses.length;
+  // Challenger World 3: middle boss is cut, so milestone 0/1/2 map to boss species 0/2/3 instead of 0/1/2.
+  const bossIdx = chalIsW3() ? (CHAL_BOSS_MAP_W3[milestoneIdx] ?? milestoneIdx) : milestoneIdx;
   const def = gameMode==='practice'
     ? curBosses[Math.floor(Math.random()*curBosses.length)]
-    : curBosses[(Math.floor(wave/5)-1) % curBosses.length];
+    : curBosses[bossIdx];
   const chalMul = gameMode==='challenger' ? 3.5 : 1;
   const mult = (1 + (wave-5)*0.12) * (curWorld().hpMul||1) * (1 + worldBand()*0.42) * chalMul;
   const p = arena ? { x:arena.x+arena.w/2, y:arena.y+arena.h*0.28 } : ringPos();
   const bar1 = def.hp*HP_MULT*mult, bar2 = (def.hp2||0)*HP_MULT*mult;
   const baseTotal = bar1+bar2;
   // each world's last boss = its FINAL boss: a beefed phase 3 whose HP alone tops phases 1+2 combined
-  const bossIdx = ((Math.floor(wave/5)-1) % curBosses.length + curBosses.length) % curBosses.length;
   const isFinal = bossIdx === curBosses.length-1;
   const p3pool = isFinal ? baseTotal*1.5 : 0;     // phase 3 = 1.5x of phases 1+2 → "more than 1 and 2 combined"
   const total  = baseTotal + p3pool;
@@ -2319,7 +2326,9 @@ function update(dt){
             e.shootCd = e.shoot.cd || rand(2.5,4.5);
             const spd = e.shoot.spd||140, col = e.shoot.col||'#e23b3b';
             muzzleFlash(e.x, e.y, col);   // colored puff = "this enemy fired these bullets"
-            const opts = e.shoot.split ? {split:true, splitT:0.55} : undefined;
+            const opts = {};
+            if(e.shoot.split) Object.assign(opts, {split:true, splitT:0.55});
+            if(e.spr==='garamaraman' && gameMode==='challenger' && worldIdx===2) opts.dmgMul=0.75;   // Challenger World 3 swarm enemy: -25% bullet dmg since it spawns endlessly
             if(e.shoot.arc){               // lobbed shot: telegraphed landing zone instead of a bullet line
               const n=e.shoot.n||1; for(let k=0;k<n;k++) addZone(P.x+rand(-30,30)+ (k-(n-1)/2)*40, P.y+rand(-30,30), 40, {tele:0.85, life:0.5, dps:15, col});
             }
@@ -2411,7 +2420,7 @@ function update(dt){
         ebullets=[];
         enemies=enemies.filter(o=>o.isBoss);
         zones=[];
-        if(gameMode==='challenger' && chalBossIdx>=CHAL_BOSS_TIMES.length-1){
+        if(gameMode==='challenger' && chalBossIdx>=curChalBossTimes().length-1){
           chalWorldCleared(e);   // final challenger boss → world clear (practice never reaches this — hasMoreMilestones() is always true)
         } else {
           chalBossIdx++;
@@ -2482,7 +2491,7 @@ function update(dt){
       for(let s=-1;s<=1;s++) fireEB(b.x,b.y, base+s*0.32, sp, b.color);
       ebullets.splice(i,1); continue;
     }
-    if(dist2(b.x,b.y,P.x,P.y) < (b.r+P.r-3)*(b.r+P.r-3)){ ebullets.splice(i,1); hurtPlayer(8*chalDmgMul(), b); }
+    if(dist2(b.x,b.y,P.x,P.y) < (b.r+P.r-3)*(b.r+P.r-3)){ ebullets.splice(i,1); hurtPlayer(8*chalDmgMul()*(b.dmgMul||1), b); }
   }
 
   // --- lucky blocks ---
