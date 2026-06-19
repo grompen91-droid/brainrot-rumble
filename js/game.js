@@ -4753,10 +4753,16 @@ function drawMinimapCard(view,mx,my){
   cx.save();
   cx.beginPath(); cx.roundRect(mx,my,mw,mh,11); cx.clip();
   const tile=Math.max(22,Math.round(Math.max(mw,mh)/6));
-  for(let y=0;y<mh;y+=tile){
-    for(let x=0;x<mw;x+=tile){
-      cx.fillStyle=((x/tile+y/tile)&1) ? (curTheme.tile2||'#82c84a') : (curTheme.tile1||'#76bf42');
-      cx.fillRect(mx+x,my+y,Math.min(tile,mw-x),Math.min(tile,mh-y));
+  const c1=curTheme.tile1||'#76bf42', c2=curTheme.tile2||'#82c84a';
+  // Anchor the checker to world space so on scrolling (infinite/challenger) maps the background
+  // moves with the player instead of sitting static. view.ox/oy are 0 on fixed maps -> unchanged there.
+  const wtile=tile/view.sx;                                  // world units per checker cell
+  const baseIX=Math.floor(view.ox/wtile), baseIY=Math.floor(view.oy/wtile);
+  const offX=(view.ox-baseIX*wtile)*view.sx, offY=(view.oy-baseIY*wtile)*view.sy;   // fractional scroll, in minimap px
+  for(let gy=-1; gy*tile-offY<mh; gy++){
+    for(let gx=-1; gx*tile-offX<mw; gx++){
+      cx.fillStyle=((baseIX+gx+baseIY+gy)&1) ? c2 : c1;
+      cx.fillRect(mx+gx*tile-offX, my+gy*tile-offY, tile, tile);   // overdraw clipped by the rounded-rect clip above
     }
   }
   drawMiniArena(view,mx,my);
