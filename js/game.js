@@ -164,7 +164,7 @@ const MAX_SHOOTERS = 14;                    // foes with any `shoot` attack
 const MAX_HAZARD   = 4;                     // "earthquake" types: ground AoE / geyser / debris
 const MAX_BURST    = 4;                     // burst shooters: ring volleys or 3+ aimed shots
 const SPECIAL_HP_BUFF = 1.6, SPECIAL_DMG_BUFF = 1.3;   // hazard/burst foes are rarer, so tankier & hit harder
-const MAXPARTS = 280, MAXEB = 350;   // hard caps on particles / enemy bullets (bound worst-case render + GC)
+const MAXPARTS = 160, MAXEB = 240;   // hard caps on particles / enemy bullets (bound worst-case render + GC)
 function foeIsShooter(d){ return !!d.shoot; }
 function foeIsHazard(d){ return !!d.aoe || (d.cast && (d.cast.kind==='geyser'||d.cast.kind==='debris')); }
 function foeIsBurst(d){ return !!d.shoot && (d.shoot.type==='ring' || (d.shoot.n||1)>=3); }
@@ -2556,16 +2556,15 @@ function update(dt){
   }
 
   // --- particles & texts ---
-  if(parts.length>MAXPARTS) parts.splice(0, parts.length-MAXPARTS);   // cap particle count (drop oldest)
-  for(let i=parts.length-1;i>=0;i--){
-    const p=parts[i];
-    if(p.ring){
-      p.r+=(p.gr||600)*dt; p.life-=dt;
-      if(p.life<=0 || p.r>1400) { parts.splice(i,1); continue; }  // cull huge off-screen rings
-      continue;
+  if(parts.length>MAXPARTS) parts.length=MAXPARTS;   // cap: drop newest overflow
+  { let pi=0;
+    for(let i=0;i<parts.length;i++){
+      const p=parts[i];
+      if(p.ring){ p.r+=(p.gr||600)*dt; p.life-=dt; if(p.life>0 && p.r<1400) parts[pi++]=p; continue; }
+      p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.9; p.vy*=0.9; p.life-=dt;
+      if(p.life>0) parts[pi++]=p;
     }
-    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.9; p.vy*=0.9; p.life-=dt;
-    if(p.life<=0) parts.splice(i,1);
+    parts.length=pi;
   }
   for(let i=texts.length-1;i>=0;i--){
     const t=texts[i]; t.x+=(t.vx||0)*dt; t.y+=t.vy*dt; t.life-=dt;
@@ -4070,7 +4069,8 @@ function render(){
   // --- player bullets: bright gold with a white halo = YOURS ---
   const bcore = P.railgun ? '#5fe6ff' : P.soldierBullets ? '#1a1a22' : P.whiteBullets ? '#ffffff' : '#ffd21f';
   const bhi   = P.railgun ? '#dafcff' : P.soldierBullets ? '#44444e' : P.whiteBullets ? '#bcdcff' : '#fff6bf';
-  if(P.ghostBullets) cx.globalAlpha=0.6;   // Fantasma: slightly translucent shots
+  if(P.ghostBullets) cx.globalAlpha=0.6;
+  // draw special bullets first (per-bullet), then batch plain bullets in 3 passes
   for(const b of bullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     if(b.boom){ drawBoomerangCroc(b); continue; }
@@ -4078,12 +4078,20 @@ function render(){
     if(b.lucky){
       if(b.luckyCrit){ cx.filter='grayscale(1) contrast(1.1)'; drawSprite('luckyblock',b.x,b.y,b.r*7,0,0,0,false,null); cx.filter='none'; }
       else drawSprite('luckyblock',b.x,b.y,b.r*5,0,0,0,false,null);
-      continue;
     }
-    cx.fillStyle='#fff'; cx.beginPath(); cx.arc(b.x,b.y,b.r+2,0,TAU); cx.fill();
-    cx.fillStyle=bcore; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill();
-    cx.fillStyle=bhi; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.4,0,TAU); cx.fill();
   }
+  // rim pass
+  cx.fillStyle='#fff'; cx.beginPath();
+  for(const b of bullets){ if(b.boom||b.knife||b.lucky) continue; if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue; cx.moveTo(b.x+b.r+2,b.y); cx.arc(b.x,b.y,b.r+2,0,TAU); }
+  cx.fill();
+  // core pass
+  cx.fillStyle=bcore; cx.beginPath();
+  for(const b of bullets){ if(b.boom||b.knife||b.lucky) continue; if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue; cx.moveTo(b.x+b.r,b.y); cx.arc(b.x,b.y,b.r,0,TAU); }
+  cx.fill();
+  // highlight pass
+  cx.fillStyle=bhi; cx.beginPath();
+  for(const b of bullets){ if(b.boom||b.knife||b.lucky) continue; if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue; const hx2=b.x-b.r*0.3,hy2=b.y-b.r*0.3,hr=b.r*0.4; cx.moveTo(hx2+hr,hy2); cx.arc(hx2,hy2,hr,0,TAU); }
+  cx.fill();
   if(P.ghostBullets) cx.globalAlpha=1;
 
   // --- pet bullets: small cyan dot ---
@@ -4117,6 +4125,10 @@ function render(){
   // idle sprite wobble forces every drawImage onto canvas's slower rotated-blit path (any non-zero
   // rotation does); skip it once there are enough visible enemies that the blit cost actually matters
   const skipWob = _vis.length > 40;
+  // batch all enemy shadows in one fill call
+  cx.fillStyle='rgba(40,60,25,0.28)'; cx.beginPath();
+  for(const e of _vis){ if(!e.under) cx.ellipse(e.x, e.y+e.r*0.85, e.r*0.8, e.r*0.32, 0,0,TAU); }
+  cx.fill();
   for(const e of _vis){
     if(e.under){   // burrowed: just a heaving dirt mound that tracks the player
         const w=e.r*1.1+Math.sin(e.t*10)*3;
@@ -4124,9 +4136,6 @@ function render(){
         cx.fillStyle='#6e4d34'; cx.beginPath(); cx.ellipse(e.x,e.y-2,w*0.7,w*0.32,0,Math.PI,TAU); cx.fill();
         continue;
     }
-    // shadow
-    cx.fillStyle='rgba(40,60,25,0.28)';
-    cx.beginPath(); cx.ellipse(e.x, e.y+e.r*0.85, e.r*0.8, e.r*0.32, 0,0,TAU); cx.fill();
     if(e.dst==='wind'){   // charge-dash wind-up: shows WHERE it will charge (bosses get a long bright arrow)
       const len=e.isBoss?260:150, lw=e.isBoss?6:4;
       const ex=e.x+Math.cos(e.da)*len, ey=e.y+Math.sin(e.da)*len;
@@ -4184,20 +4193,12 @@ function render(){
     cx.globalAlpha=1; cx.restore();
   }
 
-  // --- enemy bullets: thick dark rim + dark core = HOSTILE ---
-  // glow pass (one globalAlpha change for all bullets)
-  cx.globalAlpha=0.28;
-  for(const b of ebullets){
-    if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
-    cx.fillStyle=b.color||'#e54d4d'; cx.beginPath(); cx.arc(b.x,b.y,b.r*1.8,0,TAU); cx.fill();
-  }
-  // core + rim + highlight pass
-  cx.globalAlpha=1; cx.lineWidth=3.2; cx.strokeStyle=OUT;
+  // --- enemy bullets: core + rim (glow pass removed — saves N arc() calls/frame) ---
+  cx.lineWidth=3.2; cx.strokeStyle=OUT;
   for(const b of ebullets){
     if(b.x<vx0-30||b.x>vx1+30||b.y<vy0-30||b.y>vy1+30) continue;
     const bc=b.color||'#e54d4d';
     cx.fillStyle=bc; cx.beginPath(); cx.arc(b.x,b.y,b.r,0,TAU); cx.fill(); cx.stroke();
-    cx.fillStyle='rgba(255,255,255,0.55)'; cx.beginPath(); cx.arc(b.x-b.r*0.3,b.y-b.r*0.3,b.r*0.34,0,TAU); cx.fill();
   }
 
   // --- active pet (trails directly behind player) ---
@@ -4239,10 +4240,6 @@ function render(){
 
   // --- player ---
   if(state!==ST.MENU){
-    // faint range indicator
-    cx.globalAlpha=0.09; cx.strokeStyle='#ffffff'; cx.lineWidth=2; cx.setLineDash([9,11]);
-    cx.beginPath(); cx.arc(P.x,P.y,P.range,0,TAU); cx.stroke();
-    cx.setLineDash([]); cx.globalAlpha=1;
     cx.fillStyle='rgba(40,60,25,0.3)';
     cx.beginPath(); cx.ellipse(P.x, P.y+P.r*0.9, P.r*0.85, P.r*0.34, 0,0,TAU); cx.fill();
     const blink = P.inv>0 && P.dashT<=0 && Math.floor(P.inv*12)%2===0;
@@ -4384,6 +4381,7 @@ function renderArena(vx0,vy0,vx1,vy1){
 }
 
 function renderZones(){
+  const zDashOff = -elapsed*140;
   for(const z of zones){
     const danger = z.col||'#e8a93a';
     if(z.friendly){                       // player-owned field: soft, no danger telegraph — clearly yours & safe
@@ -4391,7 +4389,7 @@ function renderZones(){
       const fill=z.col||'#bfe6ff';
       cx.globalAlpha=0.16*k+0.06; cx.fillStyle=fill; cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.fill();
       cx.globalAlpha=0.7*k; cx.lineWidth=3; cx.strokeStyle=fill;
-      cx.setLineDash([4,8]); cx.lineDashOffset=elapsed*60;   // gentle drifting dotted ring, distinct from enemy hazards
+      cx.setLineDash([4,8]); cx.lineDashOffset=-zDashOff*0.43;
       cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.stroke(); cx.setLineDash([]);
       cx.globalAlpha=1; continue;
     }
@@ -4404,7 +4402,7 @@ function renderZones(){
       cx.globalAlpha=0.30+0.34*k; cx.fillStyle=danger; cx.beginPath(); cx.arc(z.x,z.y,z.r*k,0,TAU); cx.fill();
       // bold rotating warning ring (turns white the instant before it fires)
       cx.globalAlpha=1; cx.lineWidth=imminent?8:5; cx.strokeStyle=imminent?'#fff':danger;
-      cx.setLineDash([11,7]); cx.lineDashOffset=-elapsed*140;
+      cx.setLineDash([11,7]); cx.lineDashOffset=zDashOff;
       cx.beginPath(); cx.arc(z.x,z.y,z.r,0,TAU); cx.stroke(); cx.setLineDash([]);
       // dark contrast outline
       cx.lineWidth=2.5; cx.strokeStyle='rgba(0,0,0,0.55)'; cx.beginPath(); cx.arc(z.x,z.y,z.r+2,0,TAU); cx.stroke();
@@ -4603,6 +4601,7 @@ function drawMinimapCard(view,mx,my){
 // ============ MAIN LOOP ============
 function loop(t){
   requestAnimationFrame(loop);
+  if(t - tPrev < 14.5) return;   // ~69fps cap — skip frames on 120/144Hz to halve render cost
   let dt = Math.min(0.033, (t-tPrev)/1000 || 0.016);
   tPrev = t;
   if(hitstop>0){ hitstop-=dt; dt=0; }
