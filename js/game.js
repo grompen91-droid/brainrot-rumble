@@ -1219,9 +1219,11 @@ function chalWorldCleared(e){
 
 // lock the field into a small bounded arena around the player; boss arrives after a delay
 function startBossArena(){
-  // arena fits inside the world even in thin corridors (clamped to map width/height)
-  const arenaSize = ARENA_SIZE * (gameMode==='challenger' ? CHAL_ARENA_MUL : 1);
-  const aw = Math.min(arenaSize, WORLD.w-2*WALL), ah = Math.min(arenaSize, WORLD.h-2*WALL);
+  const base = ARENA_SIZE * (gameMode==='challenger' ? CHAL_ARENA_MUL : 1);
+  const usableW = WORLD.w - 2*WALL, usableH = WORLD.h - 2*WALL;
+  // shape arena to match world aspect ratio: 45% of each world dimension, min 600px, 80px margin each side
+  const aw = Math.min(Math.max(600, usableW * 0.45), base, usableW - 80);
+  const ah = Math.min(Math.max(600, usableH * 0.45), base, usableH - 80);
   const cxw = clamp(P.x, WALL+aw/2, WORLD.w-WALL-aw/2);
   const cyw = clamp(P.y, WALL+ah/2, WORLD.h-WALL-ah/2);
   arena = { x:cxw-aw/2, y:cyw-ah/2, w:aw, h:ah };
@@ -2632,19 +2634,22 @@ function mWall(side, spd, col, gapAt, gapW, n){
   if(!arena) return; const a=arena;
   if(side==='left'||side==='right'){
     const x=side==='left'?a.x+12:a.x+a.w-12, vx=side==='left'?spd:-spd;
-    for(let i=0;i<n;i++){ const y=a.y+(i+0.5)*a.h/n; if(Math.abs(y-gapAt)<gapW) continue; ebullets.push({x,y,vx,vy:0,r:7,color:col}); }
+    const sn=Math.max(6,Math.round(n*a.h/ARENA_SIZE));
+    for(let i=0;i<sn;i++){ const y=a.y+(i+0.5)*a.h/sn; if(Math.abs(y-gapAt)<gapW) continue; ebullets.push({x,y,vx,vy:0,r:7,color:col}); }
   } else {
     const y=side==='top'?a.y+12:a.y+a.h-12, vy=side==='top'?spd:-spd;
-    for(let i=0;i<n;i++){ const x=a.x+(i+0.5)*a.w/n; if(Math.abs(x-gapAt)<gapW) continue; ebullets.push({x,y,vx:0,vy,r:7,color:col}); }
+    const sn=Math.max(6,Math.round(n*a.w/ARENA_SIZE));
+    for(let i=0;i<sn;i++){ const x=a.x+(i+0.5)*a.w/sn; if(Math.abs(x-gapAt)<gapW) continue; ebullets.push({x,y,vx:0,vy,r:7,color:col}); }
   }
   sfx.warn();
 }
 // a telegraphed LINE of hazard zones spanning the arena with one safe gap (a "wall you step through" on the ground)
 function zoneLine(horizontal, pos, gapAt, gapW, col, n, tele){
   if(!arena) return; const a=arena;
-  for(let i=0;i<n;i++){
-    if(horizontal){ const x=a.x+(i+0.5)*a.w/n; if(Math.abs(x-gapAt)<gapW) continue; addZone(x,pos,46,{tele:tele||0.8,life:0.5,dps:15,col}); }
-    else { const y=a.y+(i+0.5)*a.h/n; if(Math.abs(y-gapAt)<gapW) continue; addZone(pos,y,46,{tele:tele||0.8,life:0.5,dps:15,col}); }
+  const sn=Math.max(5,Math.round(n*(horizontal?a.w:a.h)/ARENA_SIZE));
+  for(let i=0;i<sn;i++){
+    if(horizontal){ const x=a.x+(i+0.5)*a.w/sn; if(Math.abs(x-gapAt)<gapW) continue; addZone(x,pos,46,{tele:tele||0.8,life:0.5,dps:15,col}); }
+    else { const y=a.y+(i+0.5)*a.h/sn; if(Math.abs(y-gapAt)<gapW) continue; addZone(pos,y,46,{tele:tele||0.8,life:0.5,dps:15,col}); }
   }
 }
 // shortest distance from point (px,py) to the segment (ax,ay)-(bx,by) — used by the duo tether beam
