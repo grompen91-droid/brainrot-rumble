@@ -19,7 +19,7 @@ let chaosSchedule=[],chaosWaveIdx=0,chaosMidTimer=-1;
 let chaosAnnounceT=0,_chaosQueuedFn=null;
 let chaosSpeedT=0,chaosBlackoutT=0,chaosGiantN=0;
 let chaosGravT=0; // >0=scatter away, <0=rush toward player
-let chaosShrinkT=0;   // coins collected during the CURRENT world run (in-game HUD display; total still banked in `gold`)
+let chaosShrinkT=0,chaosDisarmT=0,chaosBerserkT=0;   // coins collected during the CURRENT world run (in-game HUD display; total still banked in `gold`)
 let _lastSec=-1;    // throttles the survival-timer DOM update to once per second
 const MMH = window.MINIMAP_HELPERS;
 // ===== CHALLENGER MODE STATE =====
@@ -1444,7 +1444,8 @@ function scheduleChaos(){
     16+Math.floor(Math.random()*4),
   ];
   chaosWaveIdx=0; chaosMidTimer=-1; chaosAnnounceT=0; _chaosQueuedFn=null;
-  chaosSpeedT=0; chaosBlackoutT=0; chaosGiantN=0; chaosGravT=0; chaosShrinkT=0; _chaosMagN=0;
+  chaosSpeedT=0; chaosBlackoutT=0; chaosGiantN=0; chaosGravT=0;
+  chaosShrinkT=0; chaosDisarmT=0; chaosBerserkT=0; _chaosMagN=0;
   const el=$('chaos-announce'); if(el) el.classList.add('hidden');
 }
 
@@ -1499,46 +1500,53 @@ function _chaosBossCrash(){
   sfx.boss();
 }
 
-// SVG icons for chaos card — stroke-based, currentColor
+// SVG icons for chaos card — stroke-based, currentColor, no fill
 const CHAOS_SVGS={
-  'CLONE WAR':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><circle cx="17" cy="14" r="7" stroke="currentColor" stroke-width="2.5" fill="none"/><path d="M7 38c0-6 4-10 10-10h0c6 0 10 4 10 10" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="32" cy="14" r="7" stroke="currentColor" stroke-width="2.5" fill="none" opacity=".38"/><path d="M22 38c0-6 4-10 10-10h0c6 0 10 4 10 10" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".38"/></svg>`,
-  'SPEED SURGE':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><polyline points="6,18 20,18 14,24 28,24 22,30 42,30" stroke="currentColor" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  'BULLET STORM':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><line x1="10" y1="6" x2="6" y2="22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="22" y1="4" x2="18" y2="20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="34" y1="6" x2="30" y2="22" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="8" cy="34" r="5" stroke="currentColor" stroke-width="2.5" fill="none"/><circle cx="24" cy="36" r="5" stroke="currentColor" stroke-width="2.5" fill="none"/><circle cx="40" cy="34" r="5" stroke="currentColor" stroke-width="2.5" fill="none"/></svg>`,
-  'GIANT':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="19" stroke="currentColor" stroke-width="2.5" fill="none"/><line x1="24" y1="34" x2="24" y2="12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="15,21 24,12 33,21" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  'BLACKOUT':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><path d="M30 8 A16 16 0 1 0 30 40 A11 11 0 1 1 30 8Z" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linejoin="round"/></svg>`,
-  'BOSS CRASH':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><polygon points="24,4 27,17 40,17 30,25 34,38 24,31 14,38 18,25 8,17 21,17" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/></svg>`,
-  'GRAVITY':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="4" stroke="currentColor" stroke-width="2" fill="none"/><line x1="24" y1="20" x2="24" y2="8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="20,12 24,8 28,12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="24" y1="28" x2="24" y2="40" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="20,36 24,40 28,36" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="20" y1="24" x2="8" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="12,20 8,24 12,28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="28" y1="24" x2="40" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="36,20 40,24 36,28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  'FREEZE':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><line x1="24" y1="4" x2="24" y2="44" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="4" y1="24" x2="44" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="10" y1="10" x2="38" y2="38" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><line x1="38" y1="10" x2="10" y2="38" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="24" r="4" stroke="currentColor" stroke-width="2" fill="none"/></svg>`,
-  'SWARM':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="30" r="4.5" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="24" cy="38" r="4.5" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="36" cy="30" r="4.5" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="18" cy="20" r="3.8" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="30" cy="20" r="3.8" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="24" cy="10" r="3" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>`,
-  'MAGNET PULL':`<svg viewBox="0 0 48 48" width="52" height="52" xmlns="http://www.w3.org/2000/svg"><path d="M10 10 L10 28 A14 14 0 0 0 38 28 L38 10" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/><line x1="6" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="34" y1="10" x2="42" y2="10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><line x1="24" y1="36" x2="24" y2="46" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="20,42 24,46 28,42" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  'CLONE WAR':   `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="13" r="7" stroke="currentColor" stroke-width="2.6" fill="none"/><path d="M6 38c0-6 4.5-10 10-10s10 4 10 10" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round"/><circle cx="32" cy="13" r="7" stroke="currentColor" stroke-width="2.6" fill="none" opacity=".35"/><path d="M22 38c0-6 4.5-10 10-10s10 4 10 10" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".35"/></svg>`,
+  'SPEED SURGE': `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><polyline points="5,17 19,17 13,24 27,24 21,31 43,31" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  'BULLET STORM':`<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><line x1="10" y1="5" x2="5" y2="22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><line x1="24" y1="3" x2="19" y2="20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><line x1="38" y1="5" x2="33" y2="22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><ellipse cx="7" cy="33" rx="4" ry="6" stroke="currentColor" stroke-width="2.3" fill="none"/><ellipse cx="24" cy="35" rx="4" ry="6" stroke="currentColor" stroke-width="2.3" fill="none"/><ellipse cx="41" cy="33" rx="4" ry="6" stroke="currentColor" stroke-width="2.3" fill="none"/></svg>`,
+  'GIANT':       `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2.6" fill="none"/><line x1="24" y1="35" x2="24" y2="11" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><polyline points="14,21 24,11 34,21" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  'BLACKOUT':    `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><path d="M29 7 A17 17 0 1 0 29 41 A11 11 0 1 1 29 7Z" stroke="currentColor" stroke-width="2.6" fill="none"/><line x1="36" y1="10" x2="40" y2="6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="40" y1="18" x2="45" y2="16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="39" y1="27" x2="44" y2="28" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`,
+  'BOSS CRASH':  `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><polygon points="24,3 27.5,16 41,16 30,25 34,38 24,30 14,38 18,25 7,16 20.5,16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linejoin="round"/><line x1="24" y1="38" x2="24" y2="46" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><polyline points="19,42 24,46 29,42" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  'GRAVITY':     `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="3.5" stroke="currentColor" stroke-width="2" fill="none"/><line x1="24" y1="20" x2="24" y2="8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="20,12 24,8 28,12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="24" y1="28" x2="24" y2="40" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="20,36 24,40 28,36" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="20" y1="24" x2="8" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="12,20 8,24 12,28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="28" y1="24" x2="40" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="36,20 40,24 36,28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  'BERSERK':     `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><path d="M24 6 L28 18 L40 14 L32 24 L40 34 L28 30 L24 42 L20 30 L8 34 L16 24 L8 14 L20 18 Z" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linejoin="round"/></svg>`,
+  'DISARM':      `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><line x1="12" y1="28" x2="30" y2="10" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M30 10 L38 12 L36 20 L30 10Z" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linejoin="round"/><line x1="6" y1="42" x2="18" y2="30" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><line x1="8" y1="6" x2="42" y2="40" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity=".7"/><line x1="6" y1="8" x2="40" y2="42" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity=".7"/></svg>`,
+  'SWARM':       `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="31" r="4.5" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="24" cy="38" r="4.5" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="37" cy="31" r="4.5" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="17" cy="21" r="3.8" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="31" cy="21" r="3.8" stroke="currentColor" stroke-width="2.2" fill="none"/><circle cx="24" cy="11" r="3.2" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>`,
+  'BOMB RAIN':   `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="26" r="12" stroke="currentColor" stroke-width="2.6" fill="none"/><line x1="24" y1="14" x2="24" y2="8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M24 8 Q28 4 32 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/><line x1="8" y1="42" x2="14" y2="36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".6"/><line x1="16" y1="44" x2="18" y2="37" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".6"/><line x1="24" y1="44" x2="24" y2="38" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".6"/><line x1="32" y1="44" x2="30" y2="37" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".6"/><line x1="40" y1="42" x2="34" y2="36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg>`,
 };
 
-let _chaosMagN=0; // count of gems with _chaosMag set — skip gem loop when 0
+let _chaosMagN=0;
 
 const CHAOS_EVENTS=[
-  {name:'CLONE WAR',   fn:()=>_chaosCloneWar()},
-  {name:'SPEED SURGE', fn:()=>{chaosSpeedT=8;}},
-  {name:'BULLET STORM',fn:()=>_chaosBulletStorm()},
-  {name:'GIANT',       fn:()=>{chaosGiantN=6;}},
-  {name:'BLACKOUT',    fn:()=>{chaosBlackoutT=6;}},
-  {name:'BOSS CRASH',  fn:()=>_chaosBossCrash()},
-  {name:'GRAVITY',     fn:()=>{chaosGravT=3;}},
-  {name:'FREEZE',      fn:()=>{for(const e of enemies){if(!e.isBoss)e.frz=Math.max(e.frz,3);}}},
-  {name:'SWARM',       fn:()=>{ let n=18;while(n-->0&&enemies.length<MAX_ENEMIES-1){const p=ringPos(),f=curFoes[0];enemies.push({spr:f.spr,name:f.name,x:p.x,y:p.y,r:f.r*0.65,hp:f.hp*HP_MULT*0.28,maxHp:f.hp*HP_MULT*0.28,_shooter:false,_hazard:false,_burst:false,dmgBuff:0.5,sp:f.sp*1.8,xp:f.xp*0.25,score:8,range:0,shoot:null,death:null,aoe:null,aoeCd:3,dash:false,dst:'idle',dcd:2,da:0,dwin:0,ddur:0,shell:false,shellCd:5,iv:0.25,support:null,supCd:3,front:0,kb:0,pullAura:0,trail:null,trailT:0,cast:null,castCd:0,under:false,digT:0,spin:0,t:rand(0,TAU),wob:rand(2,4),shootCd:3,frz:0,isBoss:false,hitT:0,sq:0,face:1,chaosSwarm:true});}}},
-  {name:'MAGNET PULL', fn:()=>{for(const g of gems){g._chaosMag=true;} _chaosMagN=gems.length;}},
+  {name:'CLONE WAR',    fn:()=>_chaosCloneWar()},
+  {name:'SPEED SURGE',  fn:()=>{chaosSpeedT=8;}},
+  {name:'BULLET STORM', fn:()=>_chaosBulletStorm()},
+  {name:'GIANT',        fn:()=>{chaosGiantN=6;}},
+  {name:'BLACKOUT',     fn:()=>{chaosBlackoutT=6;}},
+  {name:'BOSS CRASH',   fn:()=>_chaosBossCrash()},
+  {name:'GRAVITY',      fn:()=>{chaosGravT=3;}},
+  {name:'BERSERK',      fn:()=>{chaosBerserkT=7;for(const e of enemies){if(!e.isBoss&&!e.under)e.hp=Math.min(e.maxHp,e.hp+e.maxHp*0.20);}}},
+  {name:'DISARM',       fn:()=>{chaosDisarmT=3.5;}},
+  {name:'SWARM',        fn:()=>{ let n=18;while(n-->0&&enemies.length<MAX_ENEMIES-1){const p=ringPos(),f=curFoes[0];enemies.push({spr:f.spr,name:f.name,x:p.x,y:p.y,r:f.r*0.65,hp:f.hp*HP_MULT*0.28,maxHp:f.hp*HP_MULT*0.28,_shooter:false,_hazard:false,_burst:false,dmgBuff:0.5,sp:f.sp*1.8,xp:f.xp*0.25,score:8,range:0,shoot:null,death:null,aoe:null,aoeCd:3,dash:false,dst:'idle',dcd:2,da:0,dwin:0,ddur:0,shell:false,shellCd:5,iv:0.25,support:null,supCd:3,front:0,kb:0,pullAura:0,trail:null,trailT:0,cast:null,castCd:0,under:false,digT:0,spin:0,t:rand(0,TAU),wob:rand(2,4),shootCd:3,frz:0,isBoss:false,hitT:0,sq:0,face:1,chaosSwarm:true});}}},
+  {name:'BOMB RAIN',    fn:()=>{for(let i=0;i<10;i++){const a=rand(0,TAU),r=rand(28,200);addZone(P.x+Math.cos(a)*r,P.y+Math.sin(a)*r,72,{tele:1.1,life:0.85,dps:38,col:'#e04000'});}}},
 ];
 
 function fireChaosEvent(){
   const ev=pick(CHAOS_EVENTS);
-  chaosAnnounceT=2.6;
+  chaosAnnounceT=2.8;
   _chaosQueuedFn=ev.fn;
   const el=$('chaos-announce');
   if(el){
     const icon=CHAOS_SVGS[ev.name]||'';
-    el.innerHTML=`<div class="chaos-icon">${icon}</div><div class="chaos-name">${ev.name}</div>`;
+    el.innerHTML=`<div class="chaos-icon">${icon}</div><div class="chaos-label">CHAOS EVENT</div><div class="chaos-name">${ev.name}</div>`;
     el.style.animation='none'; el.offsetHeight; el.style.animation='';
     el.classList.remove('hidden');
   }
+  // brief red screen flash
+  const f=document.createElement('div');
+  f.style.cssText='position:fixed;inset:0;background:rgba(180,20,0,0.28);z-index:6;pointer-events:none;animation:chaosFlash .55s ease-out forwards';
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(),650);
 }
 
 function updateChaos(dt){
@@ -1554,6 +1562,8 @@ function updateChaos(dt){
   }
   if(chaosSpeedT>0){chaosSpeedT-=dt;if(chaosSpeedT<0)chaosSpeedT=0;}
   if(chaosBlackoutT>0){chaosBlackoutT-=dt;if(chaosBlackoutT<0)chaosBlackoutT=0;}
+  if(chaosDisarmT>0){chaosDisarmT-=dt;if(chaosDisarmT<0)chaosDisarmT=0;}
+  if(chaosBerserkT>0){chaosBerserkT-=dt;if(chaosBerserkT<0)chaosBerserkT=0;}
   if(chaosGravT>0){ chaosGravT-=dt; if(chaosGravT<=0) chaosGravT=-2.5; }
   else if(chaosGravT<0){ chaosGravT+=dt; if(chaosGravT>=0) chaosGravT=0; }
   if(chaosShrinkT>0){
@@ -2095,7 +2105,7 @@ function update(dt){
 
   // --- auto-fire at nearest enemy within range ---
   P.fireCd -= dt;
-  if(!P.noPlayerShots && P.fireCd<=0 && (enemies.length || luckies.length)){
+  if(!P.noPlayerShots && chaosDisarmT<=0 && P.fireCd<=0 && (enemies.length || luckies.length)){
     let best=null, bd=Infinity;
     for(const e of enemies){ const d=dist2(P.x,P.y,e.x,e.y); if(d<bd){bd=d;best=e;} }
     for(const lb of luckies){ const d=dist2(P.x,P.y,lb.x,lb.y); if(d<bd){bd=d;best=lb;} }   // lucky blocks are auto-targeted too
@@ -2482,7 +2492,7 @@ function update(dt){
     }
   }
   // hoist per-frame chaos constants outside the loop (avoid one branch-per-enemy inside)
-  const _cSpd = chaosSpeedT>0 ? 2 : 1;
+  const _cSpd = (chaosSpeedT>0 ? 2 : 1) * (chaosBerserkT>0 ? 1.8 : 1);
   const _gravOn = chaosGravT!==0;
   const _SKIP_DSQ = 760*760; // enemies > 760px from player skip non-essential subsystems
   for(let i=enemies.length-1;i>=0;i--){
