@@ -45,6 +45,12 @@ function _firstAudio(){
 window.addEventListener('pointerdown', _firstAudio);
 window.addEventListener('keydown', _firstAudio);
 
+// resume AudioContext on any interaction (browsers auto-suspend AC on tab background)
+function _resumeAC(){ if(typeof AC!=='undefined'&&AC&&AC.state==='suspended') AC.resume(); }
+window.addEventListener('pointerdown', _resumeAC);
+window.addEventListener('keydown', _resumeAC);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _resumeAC(); });
+
 // ---- zoom controls: buttons + scroll wheel ----
 $('zoomin').addEventListener('click', ()=>zoomBy(0.2));
 $('zoomout').addEventListener('click', ()=>zoomBy(-0.2));
