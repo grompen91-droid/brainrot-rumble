@@ -19,7 +19,7 @@ let chaosSchedule=[],chaosWaveIdx=0,chaosMidTimer=-1;
 let chaosAnnounceT=0,_chaosQueuedFn=null;
 let chaosSpeedT=0,chaosBlackoutT=0,chaosGiantN=0;
 let chaosGravT=0; // >0=scatter away, <0=rush toward player
-let chaosShrinkT=0,chaosDisarmT=0,chaosBerserkT=0,chaosBombRainT=0,chaosBombRainCd=0;   // coins collected during the CURRENT world run (in-game HUD display; total still banked in `gold`)
+let chaosShrinkT=0,chaosDisarmT=0,chaosBerserkT=0,chaosBombRainT=0,chaosBombRainCd=0,chaosLeechT=0;   // coins collected during the CURRENT world run (in-game HUD display; total still banked in `gold`)
 let _lastSec=-1;    // throttles the survival-timer DOM update to once per second
 const MMH = window.MINIMAP_HELPERS;
 // ===== CHALLENGER MODE STATE =====
@@ -1445,7 +1445,7 @@ function scheduleChaos(){
   ];
   chaosWaveIdx=0; chaosMidTimer=-1; chaosAnnounceT=0; _chaosQueuedFn=null;
   chaosSpeedT=0; chaosBlackoutT=0; chaosGiantN=0; chaosGravT=0;
-  chaosShrinkT=0; chaosDisarmT=0; chaosBerserkT=0; chaosBombRainT=0; chaosBombRainCd=0; _chaosMagN=0;
+  chaosShrinkT=0; chaosDisarmT=0; chaosBerserkT=0; chaosBombRainT=0; chaosBombRainCd=0; chaosLeechT=0; _chaosMagN=0;
   const el=$('chaos-announce'); if(el) el.classList.add('hidden');
 }
 
@@ -1506,7 +1506,7 @@ const CHAOS_SVGS={
   'SPEED SURGE': `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><polyline points="5,17 19,17 13,24 27,24 21,31 43,31" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   'BULLET STORM':`<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><line x1="10" y1="5" x2="5" y2="22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><line x1="24" y1="3" x2="19" y2="20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><line x1="38" y1="5" x2="33" y2="22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><ellipse cx="7" cy="33" rx="4" ry="6" stroke="currentColor" stroke-width="2.3" fill="none"/><ellipse cx="24" cy="35" rx="4" ry="6" stroke="currentColor" stroke-width="2.3" fill="none"/><ellipse cx="41" cy="33" rx="4" ry="6" stroke="currentColor" stroke-width="2.3" fill="none"/></svg>`,
   'GIANT':       `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2.6" fill="none"/><line x1="24" y1="35" x2="24" y2="11" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><polyline points="14,21 24,11 34,21" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  'BLACKOUT':    `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><path d="M29 7 A17 17 0 1 0 29 41 A11 11 0 1 1 29 7Z" stroke="currentColor" stroke-width="2.6" fill="none"/><line x1="36" y1="10" x2="40" y2="6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="40" y1="18" x2="45" y2="16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="39" y1="27" x2="44" y2="28" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`,
+  'LEECH':       `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><path d="M24 38 C20 34 6 26 6 16 A9 9 0 0 1 24 13 A9 9 0 0 1 42 16 C42 26 28 34 24 38Z" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linejoin="round"/><line x1="16" y1="9" x2="16" y2="3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><polyline points="13,6 16,3 19,6" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="32" y1="9" x2="32" y2="3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><polyline points="29,6 32,3 35,6" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   'BOSS CRASH':  `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><polygon points="24,3 27.5,16 41,16 30,25 34,38 24,30 14,38 18,25 7,16 20.5,16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linejoin="round"/><line x1="24" y1="38" x2="24" y2="46" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><polyline points="19,42 24,46 29,42" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   'GRAVITY':     `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="3.5" stroke="currentColor" stroke-width="2" fill="none"/><line x1="24" y1="20" x2="24" y2="8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="20,12 24,8 28,12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="24" y1="28" x2="24" y2="40" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="20,36 24,40 28,36" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="20" y1="24" x2="8" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="12,20 8,24 12,28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="28" y1="24" x2="40" y2="24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polyline points="36,20 40,24 36,28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   'BERSERK':     `<svg viewBox="0 0 48 48" width="54" height="54" xmlns="http://www.w3.org/2000/svg"><path d="M24 6 L28 18 L40 14 L32 24 L40 34 L28 30 L24 42 L20 30 L8 34 L16 24 L8 14 L20 18 Z" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linejoin="round"/></svg>`,
@@ -1522,7 +1522,7 @@ const CHAOS_EVENTS=[
   {name:'SPEED SURGE',  fn:()=>{chaosSpeedT=8;}},
   {name:'BULLET STORM', fn:()=>_chaosBulletStorm()},
   {name:'GIANT',        fn:()=>{chaosGiantN=6;}},
-  {name:'BLACKOUT',     fn:()=>{chaosBlackoutT=6;}},
+  {name:'LEECH',        fn:()=>{chaosLeechT=15;}},
   {name:'BOSS CRASH',   fn:()=>_chaosBossCrash()},
   {name:'GRAVITY',      fn:()=>{chaosGravT=3;}},
   {name:'BERSERK',      fn:()=>{chaosBerserkT=7;for(const e of enemies){if(!e.isBoss&&!e.under)e.hp=Math.min(e.maxHp,e.hp+e.maxHp*0.20);}}},
@@ -1564,6 +1564,11 @@ function updateChaos(dt){
   if(chaosBlackoutT>0){chaosBlackoutT-=dt;if(chaosBlackoutT<0)chaosBlackoutT=0;}
   if(chaosDisarmT>0){chaosDisarmT-=dt;if(chaosDisarmT<0)chaosDisarmT=0;}
   if(chaosBerserkT>0){chaosBerserkT-=dt;if(chaosBerserkT<0)chaosBerserkT=0;}
+  if(chaosLeechT>0){
+    chaosLeechT-=dt;
+    for(const e of enemies){if(!e.isBoss&&e.hp>0)e.hp=Math.min(e.maxHp,e.hp+e.maxHp*0.015*dt);}
+    if(chaosLeechT<0)chaosLeechT=0;
+  }
   if(chaosBombRainT>0){
     chaosBombRainT-=dt; chaosBombRainCd-=dt;
     if(chaosBombRainCd<=0){
